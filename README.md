@@ -23,6 +23,7 @@ Custom Lovelace card for Home Assistant that combines two visualizations in one:
 - Fully configurable Sankey diagram with unlimited sections and entities
 - Sankey supports **horizontal** and **vertical** layout
 - Customizable section separators (icon, color, text)
+- Full color theming for arc nodes, flows, glows and ring
 - Each section (arc / sankey) can be independently shown or hidden
 
 ---
@@ -69,36 +70,41 @@ arc:
 type: custom:solar-arc-card
 
 arc:
-  # Entity sensors
   solar_production: sensor.pv_production_power
   house_consumption: sensor.home_consumption_power
   grid_power: sensor.grid_active_power
 
-  # Visibility
   arc_show: true
-
-  # Section separator
   arc_title_show: true
-  arc_title_icon: mdi:flash
   arc_title_icon_show: true
-  arc_title_icon_color: "#FFD60A"
   arc_title_text: "Current State"
-  arc_title_text_color: ""
+
+  style:
+    arc_title_icon: mdi:flash
+    arc_title_icon_color: "#FFD60A"
+    arc_title_text_color: ""
+    arc_text_color: ""
+    arc_icon_color: ""
+    arc_inverter_color: ""
+    arc_grid_color: ""
+    arc_home_color: ""
+    arc_inactive_color: ""
+    arc_sun_flow_color: ""
+    arc_moon_flow_color: ""
 
 sankey:
-  # Visibility
   sankey_show: true
-
-  # Layout: horizontal (default) or vertical
   layout: horizontal
-
-  # Section separator
   sankey_title_show: true
-  sankey_title_icon: mdi:lightning-bolt
   sankey_title_icon_show: true
-  sankey_title_icon_color: ""
   sankey_title_text: "Energy Flow"
-  sankey_title_text_color: ""
+
+  style:
+    sankey_title_icon: mdi:lightning-bolt
+    sankey_title_icon_color: ""
+    sankey_title_text_color: ""
+    sankey_text_color_primary: ""
+    sankey_text_color_secondary: ""
 
   sections:
     - entities:
@@ -150,11 +156,26 @@ sankey:
 | `grid_power` | string | — | Grid power sensor (positive = export, negative = import) |
 | `arc_show` | boolean | `true` | Show/hide the entire arc section |
 | `arc_title_show` | boolean | `true` | Show/hide the separator bar above arc |
-| `arc_title_icon` | string | `mdi:flash` | MDI icon for the separator |
 | `arc_title_icon_show` | boolean | `true` | Show/hide the separator icon |
-| `arc_title_icon_color` | string | `""` | Icon color (empty = theme default) |
 | `arc_title_text` | string | `Current State` | Separator label text |
-| `arc_title_text_color` | string | `""` | Text color (empty = theme default) |
+
+### `arc.style` block
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `arc_title_icon` | string | `mdi:flash` | MDI icon for the separator |
+| `arc_title_icon_color` | string | `""` | Separator icon color (empty = theme default) |
+| `arc_title_text_color` | string | `""` | Separator text color (empty = theme default) |
+| `arc_text_color` | string | `""` | Color for all text labels in the arc (values, times) |
+| `arc_icon_color` | string | `""` | Color for all node icons (inverter, grid, home) |
+| `arc_inverter_color` | string | `""` | Background color of the inverter node |
+| `arc_grid_color` | string | `""` | Color of the grid node, glow, flow ovals and ring |
+| `arc_home_color` | string | `""` | Color of the home node, glow and flow ovals |
+| `arc_inactive_color` | string | `""` | Background color of inactive nodes |
+| `arc_sun_flow_color` | string | `""` | Color of solar flow ovals and particles (day) |
+| `arc_moon_flow_color` | string | `""` | Color of solar flow ovals and particles (night) |
+
+> **Note:** Setting `arc_grid_color` affects the grid node background, glow gradient, inverter ring segment and all grid flow ovals/particles in both import and export directions.
 
 ### `sankey` block
 
@@ -163,12 +184,19 @@ sankey:
 | `layout` | string | `horizontal` | Sankey layout — `horizontal` or `vertical` |
 | `sankey_show` | boolean | `true` | Show/hide the entire sankey section |
 | `sankey_title_show` | boolean | `true` | Show/hide the separator bar above sankey |
-| `sankey_title_icon` | string | `mdi:lightning-bolt` | MDI icon for the separator |
 | `sankey_title_icon_show` | boolean | `true` | Show/hide the separator icon |
-| `sankey_title_icon_color` | string | `""` | Icon color (empty = theme default) |
 | `sankey_title_text` | string | `Energy Flow` | Separator label text |
-| `sankey_title_text_color` | string | `""` | Text color (empty = theme default) |
 | `sections` | list | — | Sankey columns (horizontal) or rows (vertical) |
+
+### `sankey.style` block
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `sankey_title_icon` | string | `mdi:lightning-bolt` | MDI icon for the separator |
+| `sankey_title_icon_color` | string | `""` | Separator icon color (empty = theme default) |
+| `sankey_title_text_color` | string | `""` | Separator text color (empty = theme default) |
+| `sankey_text_color_primary` | string | `""` | Color for node name labels |
+| `sankey_text_color_secondary` | string | `""` | Color for node value labels (W) |
 
 ### `sankey.sections` — entity options
 

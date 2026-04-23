@@ -1,4 +1,4 @@
-// solar-arc-card.js v4r131
+// solar-arc-card.js v4r134
 
 const MDI = {
   generator:   'M6 3C4.89 3 4 3.9 4 5V16H6V17C6 17.55 6.45 18 7 18H8C8.55 18 9 17.55 9 17V16H15V17C15 17.55 15.45 18 16 18H17C17.55 18 18 17.55 18 17V16H20V5C20 3.9 19.11 3 18 3H6M12 7V5H18V7H12M12 9H18V11H12V9M8 5V9H10L7 15V11H5L8 5M22 20V22H2V20H22Z',
@@ -24,38 +24,51 @@ class SolarArcCard extends HTMLElement {
   disconnectedCallback() { clearInterval(this._timer); }
 
   setConfig(config) {
-    const arc    = config.arc    || {};
-    const sankey = config.sankey || {};
+    const arc        = config.arc    || {};
+    const sankey     = config.sankey || {};
+    const arcStyle   = arc.style    || {};
+    const skStyle    = sankey.style || {};
 
     this._config = {
-      // ── Arc entity (patří jen k arc vizualizaci) ──────────────────────────
-      // Nová místa: arc.solar_production atd.
-      // Zpětná kompatibilita: top-level solar_production / pv_entity
+      // ── Arc entity ────────────────────────────────────────────────────────
       pv_entity:    arc.solar_production  || config.solar_production  || config.pv_entity    || 'sensor.goodwe_pv_power',
       house_entity: arc.house_consumption || config.house_consumption || config.house_entity || 'sensor.goodwe_house_consumption',
       grid_entity:  arc.grid_power        || config.grid_power        || config.grid_entity  || 'sensor.goodwe_active_power',
       sun_entity:   arc.sun_entity        || config.sun_entity        || 'sun.sun',
 
       // ── Arc sekce ─────────────────────────────────────────────────────────
-      arc_show:             arc.arc_show             !== false,
-      arc_title_show:       arc.arc_title_show        !== false,
-      arc_title_icon:       arc.arc_title_icon        || 'mdi:flash',
-      arc_title_icon_show:  arc.arc_title_icon_show   !== false,
-      arc_title_icon_color: arc.arc_title_icon_color  || '',
-      arc_title_text:       arc.arc_title_text        || 'Aktuální stav',
-      arc_title_text_color: arc.arc_title_text_color  || '',
+      arc_show:            arc.arc_show            !== false,
+      arc_title_show:      arc.arc_title_show       !== false,
+      arc_title_icon_show: arc.arc_title_icon_show  !== false,
+      arc_title_text:      arc.arc_title_text       || 'Aktuální stav',
+
+      // ── Arc style (z arc.style, fallback na arc přímé pro zpět. kompatibilitu)
+      arc_title_icon:       arcStyle.arc_title_icon       || arc.arc_title_icon       || 'mdi:flash',
+      arc_title_icon_color: arcStyle.arc_title_icon_color || arc.arc_title_icon_color || '',
+      arc_title_text_color: arcStyle.arc_title_text_color || arc.arc_title_text_color || '',
+      arc_text_color:       arcStyle.arc_text_color       || '',
+      arc_icon_color:       arcStyle.arc_icon_color       || '',
+      arc_grid_color:       arcStyle.arc_grid_color       || '',
+      arc_inactive_color:   arcStyle.arc_inactive_color   || '',
+      arc_inverter_color:   arcStyle.arc_inverter_color   || '',
+      arc_home_color:       arcStyle.arc_home_color       || '',
+      arc_sun_flow_color:   arcStyle.arc_sun_flow_color   || '',
+      arc_moon_flow_color:  arcStyle.arc_moon_flow_color  || '',
 
       // ── Sankey sekce ──────────────────────────────────────────────────────
-      sankey_show:             sankey.sankey_show            !== false,
-      sankey_title_show:       sankey.sankey_title_show       !== false,
-      sankey_title_icon:       sankey.sankey_title_icon       || 'mdi:lightning-bolt',
-      sankey_title_icon_show:  sankey.sankey_title_icon_show  !== false,
-      sankey_title_icon_color: sankey.sankey_title_icon_color || '',
-      sankey_title_text:       sankey.sankey_title_text       || 'Tok energie',
-      sankey_title_text_color: sankey.sankey_title_text_color || '',
-      // sections uvnitř sankey: bloku nebo top-level (legacy)
-      sections: sankey.sections || config.sections || null,
-      sankey_layout: sankey.layout || 'horizontal',
+      sankey_show:            sankey.sankey_show           !== false,
+      sankey_title_show:      sankey.sankey_title_show      !== false,
+      sankey_title_icon_show: sankey.sankey_title_icon_show !== false,
+      sankey_title_text:      sankey.sankey_title_text      || 'Tok energie',
+      sections:               sankey.sections || config.sections || null,
+      sankey_layout:          sankey.layout   || 'horizontal',
+
+      // ── Sankey style ──────────────────────────────────────────────────────
+      sankey_title_icon:            skStyle.sankey_title_icon       || sankey.sankey_title_icon       || 'mdi:lightning-bolt',
+      sankey_title_icon_color:      skStyle.sankey_title_icon_color || sankey.sankey_title_icon_color || '',
+      sankey_title_text_color:      skStyle.sankey_title_text_color || sankey.sankey_title_text_color || '',
+      sankey_text_color_primary:    skStyle.sankey_text_color_primary   || '',
+      sankey_text_color_secondary:  skStyle.sankey_text_color_secondary || '',
 
       // ── Legacy sk_* (zpětná kompatibilita) ───────────────────────────────
       sk_grid:   config.sk_grid   || null,
@@ -250,6 +263,7 @@ class SolarArcCard extends HTMLElement {
   _buildDOM() {
     const { INV, GRD, HSE } = SolarArcCard.L;
     const { toGrid, fromGrid, toHouse } = SolarArcCard.P;
+    this._arcGrads = {};   // reset custom gradient cache
 
     this.shadowRoot.innerHTML = `
 <style>
@@ -690,7 +704,9 @@ class SolarArcCard extends HTMLElement {
     const isProd = pv > 20;
     const isExport = grid > 10;
     const isImport = grid < -10;
-    const solColor  = isDay ? '#ffd60a' : '#8EACCD';
+    const solColor  = isDay
+      ? (this._config.arc_sun_flow_color  || '#ffd60a')
+      : (this._config.arc_moon_flow_color || '#8EACCD');
     const solStroke = 'rgba(255,255,255,0.12)';
     const solIds = ['#d-sol-1','#d-sol-2','#d-sol-1g1','#d-sol-2g1','#d-sol-1g2','#d-sol-2g2','#d-sol-1g3','#d-sol-2g3'];
 
@@ -777,22 +793,37 @@ class SolarArcCard extends HTMLElement {
       }
     }
 
+    // ── Custom barvy pro oválky, particles a flow ────────────────────────────
+    const cfg      = this._config;
+    const grdColor = cfg.arc_grid_color || '#32D74B';
+    const impColor = cfg.arc_grid_color || '#0084FF';
+    const hseColor = cfg.arc_home_color || '#FF9500';
+
     this._setFlow(sr, ['#d-sol-1','#d-sol-2'], isProd,     this._dur(pv));
     this._setFlow(sr, ['#d-grd-1','#d-grd-2'], isExport,   this._dur(grid));
     this._setFlow(sr, ['#d-imp-1','#d-imp-2'], isImport,   this._dur(grid));
     this._setFlow(sr, ['#d-hse-1','#d-hse-2'], house > 20, this._dur(house));
 
-    this._setParticles(sr, 'grd', '#32D74B', isExport,   this._dur(grid));
-    this._setParticles(sr, 'imp', '#0084FF', isImport,   this._dur(grid));
-    this._setParticles(sr, 'hse', '#FF9500', house > 20, this._dur(house));
+    // Hlavy oválků — barva se jinak nemění po _buildDOM, musíme je aktualizovat
+    if (cfg.arc_grid_color) {
+      this._setOvalColor(sr, 'grd', grdColor);
+      this._setOvalColor(sr, 'imp', impColor);
+    }
+    if (cfg.arc_home_color) this._setOvalColor(sr, 'hse', hseColor);
+
+    this._setParticles(sr, 'grd', grdColor, isExport,   this._dur(grid));
+    this._setParticles(sr, 'imp', impColor, isImport,   this._dur(grid));
+    this._setParticles(sr, 'hse', hseColor, house > 20, this._dur(house));
 
     sr.querySelector('#p-from-grid').style.stroke = isImport ? 'rgba(255,255,255,0.12)' : 'transparent';
     sr.querySelector('#p-to-grid').style.stroke   = 'rgba(255,255,255,0.12)';
     sr.querySelector('#p-to-house').style.stroke  = 'rgba(255,255,255,0.12)';
 
-    const invFill = isDay ? 'rgba(255,155,50,0.90)' : 'rgba(80,170,255,0.90)';
-    const invGrad = isDay ? 'rg-org' : 'rg-blu';
-    this._nodeUpdate(sr, 'inv', isProd, invFill, invGrad, null);
+    // ── Style: node barvy a glow gradienty ───────────────────────────────────
+    const inactiveColor = cfg.arc_inactive_color || null;
+    const invFill       = cfg.arc_inverter_color || (isDay ? 'rgba(255,155,50,0.90)' : 'rgba(80,170,255,0.90)');
+    const invGradId     = cfg.arc_inverter_color ? this._ensureArcGrad(sr, cfg.arc_inverter_color) : (isDay ? 'rg-org' : 'rg-blu');
+    this._nodeUpdate(sr, 'inv', isProd, invFill, invGradId, null, inactiveColor);
     // Glow přebírá ring — potlačit glow na inv uzlu (+ strhnout gp animaci, která by přebila opacity)
     const invGlow = sr.querySelector('#inv-glow');
     invGlow.classList.remove('gp');
@@ -819,20 +850,73 @@ class SolarArcCard extends HTMLElement {
     ringSolar.setAttribute('stroke-dashoffset', '0');
     ringSolar.style.opacity = sFrac > 0.02 ? '0.92' : '0';
 
-    ringGrid.setAttribute('stroke', isImport ? '#0084FF' : '#32D74B');
+    ringGrid.setAttribute('stroke', cfg.arc_grid_color || (isImport ? '#0084FF' : '#32D74B'));
     ringGrid.setAttribute('stroke-dasharray', `${gLen} ${RC.toFixed(1)}`);
     ringGrid.setAttribute('stroke-dashoffset', gOff);
     ringGrid.style.opacity = gFrac > 0.02 ? '0.85' : '0';
 
-    const gFill = isImport ? 'rgba(80,170,255,0.90)' : isExport ? 'rgba(100,220,130,0.90)' : 'rgba(160,160,165,0.78)';
-    const gGrad = isImport ? 'rg-blu' : isExport ? 'rg-grn' : 'rg-gry';
-    const gLabel = isImport ? `← ${this._fmt(Math.abs(grid))}` :
-                   isExport ? `→ ${this._fmt(Math.abs(grid))}` :
-                   this._fmt(Math.abs(grid));
-    this._nodeUpdate(sr, 'grd', isImport || isExport, gFill, gGrad, gLabel);
-    this._nodeUpdate(sr, 'hse', house > 20, 'rgba(255,155,50,0.90)', 'rg-org', this._fmt(house));
+    const gFillDefault = isImport ? 'rgba(80,170,255,0.90)' : isExport ? 'rgba(100,220,130,0.90)' : 'rgba(160,160,165,0.78)';
+    const gFill    = cfg.arc_grid_color || gFillDefault;
+    const gGradDef = isImport ? 'rg-blu' : isExport ? 'rg-grn' : 'rg-gry';
+    const gGradId  = cfg.arc_grid_color ? this._ensureArcGrad(sr, cfg.arc_grid_color) : gGradDef;
+    const gLabel   = isImport ? `← ${this._fmt(Math.abs(grid))}` :
+                     isExport ? `→ ${this._fmt(Math.abs(grid))}` :
+                     this._fmt(Math.abs(grid));
+    const hseFill   = cfg.arc_home_color || 'rgba(255,155,50,0.90)';
+    const hseGradId = cfg.arc_home_color ? this._ensureArcGrad(sr, cfg.arc_home_color) : 'rg-org';
+    this._nodeUpdate(sr, 'grd', isImport || isExport, gFill, gGradId, gLabel, inactiveColor);
+    this._nodeUpdate(sr, 'hse', house > 20, hseFill, hseGradId, this._fmt(house), inactiveColor);
+
+    // ── Barvy textu a ikon ────────────────────────────────────────────────────
+    if (cfg.arc_text_color) {
+      ['#grd-val','#hse-val','#rise-lbl','#set-lbl'].forEach(sel => {
+        const el = sr.querySelector(sel);
+        if (el) el.setAttribute('fill', cfg.arc_text_color);
+      });
+      const pillTxt = sr.querySelector('#sun-pill-txt');
+      if (pillTxt) pillTxt.style.color = cfg.arc_text_color;
+    }
+    if (cfg.arc_icon_color) {
+      ['#inv-icon .node-path','#grd-icon .node-path','#hse-icon .node-path'].forEach(sel => {
+        const el = sr.querySelector(sel);
+        if (el) el.setAttribute('fill', cfg.arc_icon_color);
+      });
+    }
 
     this._updateSankey(sr, pv, grid, house);
+  }
+
+  // ── _ensureArcGrad: vytvoří (nebo vrátí cached) radialGradient pro custom barvu ──
+  _ensureArcGrad(sr, color) {
+    if (!this._arcGrads) this._arcGrads = {};
+    if (this._arcGrads[color]) return this._arcGrads[color];
+    const NS   = 'http://www.w3.org/2000/svg';
+    const id   = `rg-c${Object.keys(this._arcGrads).length}`;
+    const defs = sr.querySelector('svg:not(#sk-svg) defs');
+    if (!defs) return 'rg-gry';
+    const g = document.createElementNS(NS, 'radialGradient');
+    g.setAttribute('id', id);
+    g.setAttribute('cx', '50%'); g.setAttribute('cy', '50%'); g.setAttribute('r', '50%');
+    [[0,'0%'],[0,'53%'],[0.7,'64%'],[0.18,'84%'],[0,'100%']].forEach(([op, off]) => {
+      const s = document.createElementNS(NS, 'stop');
+      s.setAttribute('offset', off);
+      s.setAttribute('stop-color', color);
+      s.setAttribute('stop-opacity', String(op));
+      g.appendChild(s);
+    });
+    defs.appendChild(g);
+    this._arcGrads[color] = id;
+    return id;
+  }
+
+  // ── _setOvalColor: aktualizuje fill hlavy + ghostů pro daný prefix ────────
+  _setOvalColor(sr, prefix, color) {
+    ['1','2'].forEach(n => {
+      ['','g1','g2','g3'].forEach(sfx => {
+        const el = sr.querySelector(`#d-${prefix}-${n}${sfx}`);
+        if (el) el.setAttribute('fill', color);
+      });
+    });
   }
 
   _hexA(hex, a) {
@@ -1143,9 +1227,11 @@ class SolarArcCard extends HTMLElement {
         const eid = ent.entity_id, h = nH[eid], y = nY[eid];
         if (h < 2) return;
         const cy = y + h / 2;
-        const tN = mkT(ent.name || eid, xOff, cy-4, fsN, '600', 'rgba(255,255,255,0.90)');
+        const colP = this._config.sankey_text_color_primary   || 'rgba(255,255,255,0.90)';
+        const colS = this._config.sankey_text_color_secondary || 'rgba(255,255,255,0.65)';
+        const tN = mkT(ent.name || eid, xOff, cy-4, fsN, '600', colP);
         tN.setAttribute('text-anchor', anchor);
-        const tV = mkT(this._fmt(nVal[eid]), xOff, cy+6, fsV, '400', 'rgba(255,255,255,0.65)');
+        const tV = mkT(this._fmt(nVal[eid]), xOff, cy+6, fsV, '400', colS);
         tV.setAttribute('text-anchor', anchor);
         lG.appendChild(tN); lG.appendChild(tV);
       });
@@ -1368,8 +1454,10 @@ class SolarArcCard extends HTMLElement {
         const eid = ent.entity_id, w = nW[eid], x = nX[eid];
         if (w < 2) return;
         const cx = x + w / 2;
-        lG.appendChild(mkT(ent.name || eid,      cx, ry - NH/2 - 5,  fsN, '600', 'rgba(255,255,255,0.90)'));
-        lG.appendChild(mkT(this._fmt(nVal[eid]), cx, ry + NH/2 + 10, fsV, '400', 'rgba(255,255,255,0.65)'));
+        const colP = this._config.sankey_text_color_primary   || 'rgba(255,255,255,0.90)';
+        const colS = this._config.sankey_text_color_secondary || 'rgba(255,255,255,0.65)';
+        lG.appendChild(mkT(ent.name || eid,      cx, ry - NH/2 - 5,  fsN, '600', colP));
+        lG.appendChild(mkT(this._fmt(nVal[eid]), cx, ry + NH/2 + 10, fsV, '400', colS));
       });
     });
   }
@@ -1395,8 +1483,8 @@ class SolarArcCard extends HTMLElement {
   }
 
 
-  _nodeUpdate(sr, id, active, color, gradId, valText) {
-    const grayColor = 'rgba(160,160,165,0.78)';
+  _nodeUpdate(sr, id, active, color, gradId, valText, inactiveColor = null) {
+    const grayColor = inactiveColor || 'rgba(160,160,165,0.78)';
 
     const glow = sr.querySelector(`#${id}-glow`);
     glow.setAttribute('fill', `url(#${active ? gradId : 'rg-gry'})`);
