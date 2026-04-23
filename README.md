@@ -1,5 +1,11 @@
 # Solar Arc Card
 
+<p align="center">
+  <img src="docs/day.png" width="48%" alt="Day mode"/>
+  &nbsp;&nbsp;
+  <img src="docs/night.png" width="48%" alt="Night mode"/>
+</p>
+
 Custom Lovelace card for Home Assistant that combines two visualizations in one:
 
 - **Arc** — animated solar arc showing sun position across the sky, real-time PV production, grid flow, and house consumption with animated energy particles
