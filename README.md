@@ -18,9 +18,10 @@ Custom Lovelace card for Home Assistant that combines two visualizations in one:
 - Sun/moon arc with real-time position based on the built-in `sun.sun` entity
 - Animated energy flow particles (solar → inverter → grid / house)
 - Inverter ring chart showing solar vs. grid-import ratio
-- Day/night mode with clouds, stars, and moon
+- Day/night mode with clouds, stars, moon and pill label
 - Glassmorphism card design
 - Fully configurable Sankey diagram with unlimited sections and entities
+- Sankey supports **horizontal** and **vertical** layout
 - Customizable section separators (icon, color, text)
 - Each section (arc / sankey) can be independently shown or hidden
 
@@ -74,19 +75,22 @@ arc:
   grid_power: sensor.grid_active_power
 
   # Visibility
-  arc_show: true                 # show/hide entire arc section
+  arc_show: true
 
   # Section separator
-  arc_title_show: true           # show/hide separator bar
-  arc_title_icon: mdi:flash      # any mdi:* icon
+  arc_title_show: true
+  arc_title_icon: mdi:flash
   arc_title_icon_show: true
   arc_title_icon_color: "#FFD60A"
   arc_title_text: "Current State"
-  arc_title_text_color: ""       # empty = theme default
+  arc_title_text_color: ""
 
 sankey:
   # Visibility
-  sankey_show: true              # show/hide entire sankey section
+  sankey_show: true
+
+  # Layout: horizontal (default) or vertical
+  layout: horizontal
 
   # Section separator
   sankey_title_show: true
@@ -96,7 +100,6 @@ sankey:
   sankey_title_text: "Energy Flow"
   sankey_title_text_color: ""
 
-  # Energy flow diagram — columns (sections) from left to right
   sections:
     - entities:
         - entity_id: sensor.grid_import_power
@@ -112,7 +115,7 @@ sankey:
             - sensor.grid_export_power
     - entities:
         - entity_id: sensor.home_consumption_power
-          name: House
+          name: Home
           color: "#FF9500"
           children:
             - sensor.floor1_consumption_power
@@ -120,7 +123,7 @@ sankey:
             - sensor.floor3_consumption_power
         - entity_id: sensor.grid_export_power
           type: remaining_parent_state
-          name: Export
+          name: Grid export
           color: "#30D158"
     - entities:
         - entity_id: sensor.floor1_consumption_power
@@ -157,6 +160,7 @@ sankey:
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
+| `layout` | string | `horizontal` | Sankey layout — `horizontal` or `vertical` |
 | `sankey_show` | boolean | `true` | Show/hide the entire sankey section |
 | `sankey_title_show` | boolean | `true` | Show/hide the separator bar above sankey |
 | `sankey_title_icon` | string | `mdi:lightning-bolt` | MDI icon for the separator |
@@ -164,7 +168,7 @@ sankey:
 | `sankey_title_icon_color` | string | `""` | Icon color (empty = theme default) |
 | `sankey_title_text` | string | `Energy Flow` | Separator label text |
 | `sankey_title_text_color` | string | `""` | Text color (empty = theme default) |
-| `sections` | list | — | Sankey columns, see below |
+| `sections` | list | — | Sankey columns (horizontal) or rows (vertical) |
 
 ### `sankey.sections` — entity options
 
@@ -173,8 +177,23 @@ sankey:
 | `entity_id` | string | HA entity ID |
 | `name` | string | Display label |
 | `color` | string | Node and flow color (hex) |
-| `children` | list of entity_id | Which entities in the next column receive power from this node |
+| `children` | list of entity_id | Which entities in the next column/row receive power from this node |
 | `type` | string | Set to `remaining_parent_state` to auto-calculate value as parent minus other children |
+
+---
+
+## Layouts
+
+### Horizontal (default)
+Sections are arranged as columns from left to right. Nodes within each column are stacked vertically. Best for 2–4 columns.
+
+### Vertical
+Sections are arranged as rows from top to bottom. Nodes within each row are arranged horizontally with width proportional to their value. Best for detailed breakdowns with many entities per section.
+
+```yaml
+sankey:
+  layout: vertical
+```
 
 ---
 
