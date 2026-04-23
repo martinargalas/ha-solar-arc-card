@@ -1,4 +1,4 @@
-// solar-arc-card.js v4r128
+// solar-arc-card.js v4r131
 
 const MDI = {
   generator:   'M6 3C4.89 3 4 3.9 4 5V16H6V17C6 17.55 6.45 18 7 18H8C8.55 18 9 17.55 9 17V16H15V17C15 17.55 15.45 18 16 18H17C17.55 18 18 17.55 18 17V16H20V5C20 3.9 19.11 3 18 3H6M12 7V5H18V7H12M12 9H18V11H12V9M8 5V9H10L7 15V11H5L8 5M22 20V22H2V20H22Z',
@@ -55,6 +55,7 @@ class SolarArcCard extends HTMLElement {
       sankey_title_text_color: sankey.sankey_title_text_color || '',
       // sections uvnitř sankey: bloku nebo top-level (legacy)
       sections: sankey.sections || config.sections || null,
+      sankey_layout: sankey.layout || 'horizontal',
 
       // ── Legacy sk_* (zpětná kompatibilita) ───────────────────────────────
       sk_grid:   config.sk_grid   || null,
@@ -846,7 +847,12 @@ class SolarArcCard extends HTMLElement {
     const sects = this._config.sections
       ? this._config.sections
       : this._buildLegacySections(pvIn, gridIn, houseIn);
-    this._renderSankey(sr, sects);
+    if (this._config.sankey_layout === 'vertical') {
+      this._renderSankeyVertical(sr, sects);
+    } else {
+      sr.querySelector('#sk-svg')?.setAttribute('viewBox', '0 0 400 250');
+      this._renderSankey(sr, sects);
+    }
   }
 
   // ── _buildLegacySections: translate sk_* config → sections array ─────────
@@ -1142,6 +1148,228 @@ class SolarArcCard extends HTMLElement {
         const tV = mkT(this._fmt(nVal[eid]), xOff, cy+6, fsV, '400', 'rgba(255,255,255,0.65)');
         tV.setAttribute('text-anchor', anchor);
         lG.appendChild(tN); lG.appendChild(tV);
+      });
+    });
+  }
+
+  // ── _renderSankeyVertical: sekce = řádky shora dolů ─────────────────────
+  _renderSankeyVertical(sr, sections) {
+    const skSvg = sr.querySelector('#sk-svg');
+    if (!skSvg || !sections?.length) return;
+
+    const NS    = 'http://www.w3.org/2000/svg';
+    const NH    = 11;          // výška nodu (fixní)
+    const GH    = 24;          // výška glowu
+    const GAP_H = 5;           // mezera mezi nody ve stejném řádku
+    const PAD_L = 18, PAD_R = 18;
+    const avW   = 400 - PAD_L - PAD_R;  // 364 px
+    const PAD_T = 28, PAD_B = 22;
+    const ROW_STEP = 110;      // vzdálenost mezi středy řádků
+    const N     = sections.length;
+    const SVG_H = PAD_T + (N - 1) * ROW_STEP + PAD_B;
+    const ff    = v => v.toFixed(1);
+
+    // Dynamická výška viewBox
+    skSvg.setAttribute('viewBox', `0 0 400 ${SVG_H}`);
+
+    // Vyčistit
+    const fG   = skSvg.querySelector('#sk-flows');
+    const glG  = skSvg.querySelector('#sk-glows');
+    const nG   = skSvg.querySelector('#sk-nodes');
+    const lG   = skSvg.querySelector('#sk-labels');
+    const defs = skSvg.querySelector('#sk-defs');
+    if (!fG) return;
+    [fG, glG, nG, lG].forEach(g => { while (g.firstChild) g.removeChild(g.firstChild); });
+    [...defs.querySelectorAll('linearGradient')].forEach(el => el.remove());
+
+    // Středy řádků (y)
+    const ROWS = sections.map((_, i) => PAD_T + i * ROW_STEP);
+
+    // Registry entit
+    const entMap = {}, rowOf = {};
+    sections.forEach((sec, ri) => {
+      (sec.entities || []).forEach(ent => {
+        entMap[ent.entity_id] = ent;
+        rowOf[ent.entity_id]  = ri;
+      });
+    });
+
+    // Hodnoty nodů (stejná logika jako horizontal)
+    const nVal     = {};
+    const deferred = [];
+    sections.forEach(sec => {
+      (sec.entities || []).forEach(ent => {
+        const eid = ent.entity_id;
+        if (ent.type === 'remaining_parent_state') {
+          deferred.push(eid); nVal[eid] = 0;
+        } else {
+          nVal[eid] = Math.max(0,
+            ent._v !== undefined ? ent._v
+              : parseFloat(this._hass?.states[eid]?.state || 0) || 0
+          );
+        }
+      });
+    });
+    deferred.forEach(eid => {
+      let pv = 0, sib = 0;
+      for (const [pid, pe] of Object.entries(entMap)) {
+        if (pe.children?.includes(eid)) {
+          pv = nVal[pid];
+          (pe.children || []).forEach(cid => {
+            if (cid !== eid && !deferred.includes(cid)) sib += nVal[cid] || 0;
+          });
+          break;
+        }
+      }
+      nVal[eid] = Math.max(0, pv - sib);
+    });
+
+    // Scale: nejširší řádek se vejde do avW
+    const scArr = sections.map(sec => {
+      const active = (sec.entities || []).filter(e => nVal[e.entity_id] > 0);
+      if (!active.length) return Infinity;
+      const sumW  = active.reduce((a, e) => a + nVal[e.entity_id], 0);
+      const gapsW = Math.max(0, active.length - 1) * GAP_H;
+      return sumW > 0 ? (avW - gapsW) / sumW : Infinity;
+    }).filter(s => isFinite(s) && s > 0);
+    const S  = scArr.length ? Math.min(...scArr) : 1;
+    const nw = v => v > 0 ? Math.max(2, v * S) : 0;
+
+    // X pozice nodů — centrovaně v řádku
+    const nX = {}, nW = {};
+    sections.forEach(sec => {
+      const active = (sec.entities || []).filter(e => nw(nVal[e.entity_id]) >= 2);
+      const totalW = active.reduce((a, e) => a + nw(nVal[e.entity_id]), 0)
+                   + Math.max(0, active.length - 1) * GAP_H;
+      let x = PAD_L + (avW - totalW) / 2;
+      (sec.entities || []).forEach(ent => {
+        const w = nw(nVal[ent.entity_id]);
+        nX[ent.entity_id] = x;
+        nW[ent.entity_id] = w;
+        if (w >= 2) x += w + GAP_H;
+      });
+    });
+
+    // Flow hodnoty
+    const srcUsed = {};
+    Object.keys(nVal).forEach(eid => { srcUsed[eid] = 0; });
+    const flowList = [];
+    sections.forEach((sec, ri) => {
+      if (ri === 0) return;
+      (sec.entities || []).forEach(tgtEnt => {
+        const tgtId = tgtEnt.entity_id;
+        let remaining = nVal[tgtId];
+        if (remaining <= 0) return;
+        for (let pri = 0; pri < ri; pri++) {
+          (sections[pri].entities || []).forEach(srcEnt => {
+            if (!srcEnt.children?.includes(tgtId)) return;
+            if (remaining <= 0) return;
+            const srcId = srcEnt.entity_id;
+            const avail = nVal[srcId] - srcUsed[srcId];
+            const fv    = Math.min(avail, remaining);
+            if (fv > 0) {
+              flowList.push({ from: srcId, to: tgtId, value: fv });
+              srcUsed[srcId] += fv; remaining -= fv;
+            }
+          });
+        }
+      });
+    });
+
+    // Helpers
+    const getCol = eid => this._cssColor(entMap[eid]?.color) || '#5AC8FA';
+    let gIdx = 0;
+    const mkGrad = (id, stops, vert) => {
+      const g = document.createElementNS(NS, 'linearGradient');
+      g.setAttribute('id', id);
+      g.setAttribute('x1', '0%'); g.setAttribute('y1', '0%');
+      g.setAttribute('x2', vert ? '0%' : '100%');
+      g.setAttribute('y2', vert ? '100%' : '0%');
+      stops.forEach(([off, col, op]) => {
+        const s = document.createElementNS(NS, 'stop');
+        s.setAttribute('offset', off);
+        s.setAttribute('stop-color', col);
+        s.setAttribute('stop-opacity', String(op));
+        g.appendChild(s);
+      });
+      defs.appendChild(g); return id;
+    };
+
+    // Vertikální bezier flow: horní hrana → spodní hrana
+    const bbV = (xl, xr, y1, x2l, x2r, y2) => {
+      const my = y1 + (y2 - y1) * 0.5;
+      return `M${xl},${y1} C${xl},${my} ${x2l},${my} ${x2l},${y2} `
+           + `L${x2r},${y2} C${x2r},${my} ${xr},${my} ${xr},${y1} Z`;
+    };
+
+    // Kreslení flows
+    const srcOffH = {}, tgtOffH = {};
+    Object.keys(nVal).forEach(eid => { srcOffH[eid] = 0; tgtOffH[eid] = 0; });
+    flowList.forEach(fl => {
+      const fw = nw(fl.value);
+      if (fw < 1) return;
+      const y1   = ROWS[rowOf[fl.from]] + NH / 2;
+      const y2   = ROWS[rowOf[fl.to]]   - NH / 2;
+      const x1l  = nX[fl.from] + srcOffH[fl.from];
+      const x2l  = nX[fl.to]   + tgtOffH[fl.to];
+      srcOffH[fl.from] += fw; tgtOffH[fl.to] += fw;
+      const cSrc = getCol(fl.from), cTgt = getCol(fl.to);
+      const gid  = mkGrad(`sk-fg-${gIdx++}`, [['0%',cSrc,0.50],['100%',cTgt,0.40]], true);
+      const p = document.createElementNS(NS, 'path');
+      p.setAttribute('d', bbV(x1l, x1l + fw, y1, x2l, x2l + fw, y2));
+      p.setAttribute('fill', `url(#${gid})`);
+      fG.appendChild(p);
+    });
+
+    // Kreslení nodů
+    sections.forEach((sec, ri) => {
+      const ry = ROWS[ri];
+      (sec.entities || []).forEach(ent => {
+        const eid = ent.entity_id, w = nW[eid], x = nX[eid];
+        if (w < 2) return;
+        const col = getCol(eid);
+        // glow
+        const ggid = `sk-gg-${gIdx++}`;
+        mkGrad(ggid, [['0%',col,0],['28%',col,0.32],['72%',col,0.32],['100%',col,0]], false);
+        const gr = document.createElementNS(NS, 'rect');
+        gr.setAttribute('x', ff(x));           gr.setAttribute('y',      ff(ry - GH / 2));
+        gr.setAttribute('width', ff(w));        gr.setAttribute('height', ff(GH));
+        gr.setAttribute('rx', '7');
+        gr.setAttribute('fill', `url(#${ggid})`);
+        glG.appendChild(gr);
+        // body
+        const rb = document.createElementNS(NS, 'rect');
+        rb.setAttribute('x', ff(x));           rb.setAttribute('y',      ff(ry - NH / 2));
+        rb.setAttribute('width', ff(w));        rb.setAttribute('height', ff(NH));
+        rb.setAttribute('rx', '5.5');
+        rb.setAttribute('fill',         this._hexA(col, 0.82));
+        rb.setAttribute('stroke',       this._hexA(col, 1.0));
+        rb.setAttribute('stroke-width', '1.2');
+        nG.appendChild(rb);
+      });
+    });
+
+    // Popisky
+    const fsN  = N > 2 ? '10' : '12';
+    const fsV  = N > 2 ? '8'  : '10';
+    const FONT = "-apple-system,BlinkMacSystemFont,'SF Pro Text',sans-serif";
+    const mkT  = (text, x, y, fs, fw, fill) => {
+      const t = document.createElementNS(NS, 'text');
+      t.setAttribute('x', ff(x)); t.setAttribute('y', ff(y));
+      t.setAttribute('font-size', fs); t.setAttribute('font-weight', fw);
+      t.setAttribute('font-family', FONT); t.setAttribute('fill', fill);
+      t.setAttribute('text-anchor', 'middle');
+      t.setAttribute('filter', 'url(#sk-sh)');
+      t.textContent = text; return t;
+    };
+    sections.forEach((sec, ri) => {
+      const ry = ROWS[ri];
+      (sec.entities || []).forEach(ent => {
+        const eid = ent.entity_id, w = nW[eid], x = nX[eid];
+        if (w < 2) return;
+        const cx = x + w / 2;
+        lG.appendChild(mkT(ent.name || eid,      cx, ry - NH/2 - 5,  fsN, '600', 'rgba(255,255,255,0.90)'));
+        lG.appendChild(mkT(this._fmt(nVal[eid]), cx, ry + NH/2 + 10, fsV, '400', 'rgba(255,255,255,0.65)'));
       });
     });
   }
