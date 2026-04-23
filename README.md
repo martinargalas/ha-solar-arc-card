@@ -9,7 +9,7 @@ Custom Lovelace card for Home Assistant that combines two visualizations in one:
 
 ## Features
 
-- Sun/moon arc with real-time position based on `sun.sun` entity
+- Sun/moon arc with real-time position based on the built-in `sun.sun` entity
 - Animated energy flow particles (solar → inverter → grid / house)
 - Inverter ring chart showing solar vs. grid-import ratio
 - Day/night mode with clouds, stars, and moon
@@ -51,9 +51,9 @@ Custom Lovelace card for Home Assistant that combines two visualizations in one:
 type: custom:solar-arc-card
 
 arc:
-  solar_production: sensor.goodwe_pv_power
-  house_consumption: sensor.goodwe_house_consumption
-  grid_power: sensor.goodwe_active_power
+  solar_production: sensor.pv_production_power
+  house_consumption: sensor.home_consumption_power
+  grid_power: sensor.grid_active_power
 ```
 
 ### Full example
@@ -63,10 +63,9 @@ type: custom:solar-arc-card
 
 arc:
   # Entity sensors
-  solar_production: sensor.goodwe_pv_power
-  house_consumption: sensor.goodwe_house_consumption
-  grid_power: sensor.goodwe_active_power
-  sun_entity: sun.sun            # optional, default: sun.sun
+  solar_production: sensor.pv_production_power
+  house_consumption: sensor.home_consumption_power
+  grid_power: sensor.grid_active_power
 
   # Visibility
   arc_show: true                 # show/hide entire arc section
@@ -76,8 +75,8 @@ arc:
   arc_title_icon: mdi:flash      # any mdi:* icon
   arc_title_icon_show: true
   arc_title_icon_color: "#FFD60A"
-  arc_title_text: "Aktuální stav"
-  arc_title_text_color: ""       # empty = default white
+  arc_title_text: "Current State"
+  arc_title_text_color: ""       # empty = theme default
 
 sankey:
   # Visibility
@@ -88,44 +87,44 @@ sankey:
   sankey_title_icon: mdi:lightning-bolt
   sankey_title_icon_show: true
   sankey_title_icon_color: ""
-  sankey_title_text: "Tok energie"
+  sankey_title_text: "Energy Flow"
   sankey_title_text_color: ""
 
   # Energy flow diagram — columns (sections) from left to right
   sections:
     - entities:
-        - entity_id: sensor.grid_consumption
-          name: Síť
+        - entity_id: sensor.grid_import_power
+          name: Grid
           color: "#007AFF"
           children:
-            - sensor.house_consumption
-        - entity_id: sensor.pv_power
-          name: Výroba
+            - sensor.home_consumption_power
+        - entity_id: sensor.pv_production_power
+          name: Solar
           color: "#FFD60A"
           children:
-            - sensor.house_consumption
-            - sensor.power_sell
+            - sensor.home_consumption_power
+            - sensor.grid_export_power
     - entities:
-        - entity_id: sensor.house_consumption
-          name: Dům
+        - entity_id: sensor.home_consumption_power
+          name: House
           color: "#FF9500"
           children:
-            - sensor.house_consumption_1floor
-            - sensor.house_consumption_0floor
-            - sensor.house_consumption_rest
-        - entity_id: sensor.power_sell
+            - sensor.floor1_consumption_power
+            - sensor.floor2_consumption_power
+            - sensor.floor3_consumption_power
+        - entity_id: sensor.grid_export_power
           type: remaining_parent_state
-          name: Přetok
+          name: Export
           color: "#30D158"
     - entities:
-        - entity_id: sensor.house_consumption_1floor
-          name: L1
+        - entity_id: sensor.floor1_consumption_power
+          name: Floor 1
           color: "#5AC8FA"
-        - entity_id: sensor.house_consumption_0floor
-          name: L2
+        - entity_id: sensor.floor2_consumption_power
+          name: Floor 2
           color: "#5AC8FA"
-        - entity_id: sensor.house_consumption_rest
-          name: L3
+        - entity_id: sensor.floor3_consumption_power
+          name: Floor 3
           color: "#5AC8FA"
 ```
 
@@ -137,16 +136,15 @@ sankey:
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `solar_production` | string | `sensor.goodwe_pv_power` | PV production sensor |
-| `house_consumption` | string | `sensor.goodwe_house_consumption` | House consumption sensor |
-| `grid_power` | string | `sensor.goodwe_active_power` | Grid power sensor (positive = export, negative = import) |
-| `sun_entity` | string | `sun.sun` | Sun entity for arc position |
+| `solar_production` | string | — | PV production sensor |
+| `house_consumption` | string | — | House consumption sensor |
+| `grid_power` | string | — | Grid power sensor (positive = export, negative = import) |
 | `arc_show` | boolean | `true` | Show/hide the entire arc section |
 | `arc_title_show` | boolean | `true` | Show/hide the separator bar above arc |
 | `arc_title_icon` | string | `mdi:flash` | MDI icon for the separator |
 | `arc_title_icon_show` | boolean | `true` | Show/hide the separator icon |
 | `arc_title_icon_color` | string | `""` | Icon color (empty = theme default) |
-| `arc_title_text` | string | `Aktuální stav` | Separator label text |
+| `arc_title_text` | string | `Current State` | Separator label text |
 | `arc_title_text_color` | string | `""` | Text color (empty = theme default) |
 
 ### `sankey` block
@@ -158,7 +156,7 @@ sankey:
 | `sankey_title_icon` | string | `mdi:lightning-bolt` | MDI icon for the separator |
 | `sankey_title_icon_show` | boolean | `true` | Show/hide the separator icon |
 | `sankey_title_icon_color` | string | `""` | Icon color (empty = theme default) |
-| `sankey_title_text` | string | `Tok energie` | Separator label text |
+| `sankey_title_text` | string | `Energy Flow` | Separator label text |
 | `sankey_title_text_color` | string | `""` | Text color (empty = theme default) |
 | `sections` | list | — | Sankey columns, see below |
 
@@ -176,7 +174,7 @@ sankey:
 
 ## Grid power convention
 
-The `grid_power` sensor is expected to follow the **GoodWe / SolarEdge sign convention**:
+The `grid_power` sensor is expected to follow this sign convention:
 
 | Value | Meaning |
 |-------|---------|
@@ -190,5 +188,4 @@ If your inverter uses the opposite convention, create a template sensor that neg
 ## Requirements
 
 - Home Assistant 2023.x or newer
-- A solar inverter integration that exposes PV production, house consumption, and grid power sensors
-- `sun.sun` entity (enabled by default in all HA installations)
+- Sensors for PV production, house consumption, and grid power
