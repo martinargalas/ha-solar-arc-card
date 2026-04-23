@@ -1,4 +1,4 @@
-// solar-arc-card.js v4r121
+// solar-arc-card.js v4r128
 
 const MDI = {
   generator:   'M6 3C4.89 3 4 3.9 4 5V16H6V17C6 17.55 6.45 18 7 18H8C8.55 18 9 17.55 9 17V16H15V17C15 17.55 15.45 18 16 18H17C17.55 18 18 17.55 18 17V16H20V5C20 3.9 19.11 3 18 3H6M12 7V5H18V7H12M12 9H18V11H12V9M8 5V9H10L7 15V11H5L8 5M22 20V22H2V20H22Z',
@@ -231,12 +231,12 @@ class SolarArcCard extends HTMLElement {
   // Ikona: <ha-icon> — funguje v HA kontextu pro libovolné mdi:* ikony.
   _sepHTML(show, iconShow, icon, iconColor, text, textColor) {
     if (!show) return '';
-    const iconStyle = `width:18px;height:18px;flex-shrink:0;margin:0 14px 0 4px;opacity:0.75;` +
+    const iconStyle = `--mdc-icon-size:26px;flex-shrink:0;margin:0 14px 0 4px;opacity:0.75;display:inline-flex;align-items:center;align-self:center;` +
                       (iconColor ? `color:${iconColor};` : 'color:var(--text-color,rgba(255,255,255,0.85));');
     const iconEl = iconShow
       ? `<ha-icon icon="${icon}" style="${iconStyle}"></ha-icon>`
       : '';
-    const textStyle = `font-size:13px;font-weight:600;white-space:nowrap;margin:0 30px 0 0;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;` +
+    const textStyle = `font-size:17px;font-weight:600;white-space:nowrap;margin:0 30px 0 0;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;` +
                       (textColor ? `color:${textColor};` : 'color:var(--text-color,rgba(255,255,255,0.85));');
     return `
   <div style="display:flex;align-items:center;height:40px;padding:0 14px 0 10px;position:relative;z-index:1;">
@@ -707,6 +707,7 @@ class SolarArcCard extends HTMLElement {
       const mx = f(mp[0]), my = f(mp[1]);
       sr.querySelector('#moon-body').setAttribute('transform', `translate(${mx},${my})`);
 
+      const moonPill = sr.querySelector('#sun-pill');
       if (isProd) {
         const ex = f(L.INV[0]), ey = f(L.INV[1] - RR);
         const midY = f((mp[1] + L.INV[1] - RR) / 2);
@@ -715,10 +716,16 @@ class SolarArcCard extends HTMLElement {
         sr.querySelector('#p-solar').style.stroke = solStroke;
         solIds.forEach(id => { const e = sr.querySelector(id); if (e) { e.style.offsetPath = `path('${moonPath}')`; e.setAttribute('fill', solColor); } });
         this._setParticles(sr, 'sol', solColor, true, this._dur(pv), moonPath);
+        // Pill u měsíce
+        const pillX = mp[0] + 94 > 390 ? mp[0] - 94 : mp[0] + 14;
+        moonPill.setAttribute('transform', `translate(${f(pillX)},${f(mp[1]-16)})`);
+        moonPill.setAttribute('opacity', '1');
+        sr.querySelector('#sun-pill-txt').textContent = this._fmt(pv);
       } else {
         sr.querySelector('#p-solar').setAttribute('d', '');
         sr.querySelector('#p-solar').style.stroke = 'transparent';
         this._setParticles(sr, 'sol', solColor, false, this._dur(pv));
+        moonPill.setAttribute('opacity', '0');
       }
     }
 
@@ -922,9 +929,9 @@ class SolarArcCard extends HTMLElement {
     [fG, glG, nG, lG].forEach(g => { while (g.firstChild) g.removeChild(g.firstChild); });
     [...defs.querySelectorAll('linearGradient')].forEach(el => el.remove());
 
-    // ── Column x centers (spread 50…365) ──
-    const COLS = N === 1 ? [207]
-      : sections.map((_, i) => Math.round(50 + i * (365 - 50) / (N - 1)));
+    // ── Column x centers (spread 18…382 — full card width) ──
+    const COLS = N === 1 ? [200]
+      : sections.map((_, i) => Math.round(18 + i * (382 - 18) / (N - 1)));
 
     // ── Entity registry ──
     const entMap = {}, colOf = {};
@@ -1105,8 +1112,8 @@ class SolarArcCard extends HTMLElement {
     });
 
     // ── Draw labels ──
-    const fsN  = N > 2 ? '8' : '10';
-    const fsV  = N > 2 ? '7' : '9';
+    const fsN  = N > 2 ? '10' : '12';   // název — zvětšeno
+    const fsV  = N > 2 ? '8'  : '10';   // watty — původní velikost názvu
     const FONT = "-apple-system,BlinkMacSystemFont,'SF Pro Text',sans-serif";
     const mkT  = (text, x, y, fs, fw, fill) => {
       const t = document.createElementNS(NS, 'text');
@@ -1117,17 +1124,22 @@ class SolarArcCard extends HTMLElement {
       t.textContent = text; return t;
     };
     sections.forEach((sec, ci) => {
-      const cx    = COLS[ci];
-      const right  = ci > (N - 1) / 2;
-      const xOff   = right ? cx + NW/2 + 5 : cx - NW/2 - 5;
-      const anchor = right ? 'start' : 'end';
+      const cx     = COLS[ci];
+      // První sloupec: popisky napravo od sloupce
+      // Poslední sloupec: popisky nalevo od sloupce
+      // Ostatní: standardní logika (levá polovina → vlevo, pravá → vpravo)
+      const isFirst = ci === 0;
+      const isLast  = ci === N - 1;
+      const right   = isFirst ? true : (isLast ? false : ci > (N - 1) / 2);
+      const xOff    = right ? cx + NW/2 + 5 : cx - NW/2 - 5;
+      const anchor  = right ? 'start' : 'end';
       (sec.entities || []).forEach(ent => {
         const eid = ent.entity_id, h = nH[eid], y = nY[eid];
         if (h < 2) return;
         const cy = y + h / 2;
-        const tN = mkT(ent.name || eid, xOff, cy-3.5, fsN, '600', 'rgba(255,255,255,0.90)');
+        const tN = mkT(ent.name || eid, xOff, cy-4, fsN, '600', 'rgba(255,255,255,0.90)');
         tN.setAttribute('text-anchor', anchor);
-        const tV = mkT(this._fmt(nVal[eid]), xOff, cy+5.5, fsV, '400', 'rgba(255,255,255,0.50)');
+        const tV = mkT(this._fmt(nVal[eid]), xOff, cy+6, fsV, '400', 'rgba(255,255,255,0.65)');
         tV.setAttribute('text-anchor', anchor);
         lG.appendChild(tN); lG.appendChild(tV);
       });
