@@ -1,0 +1,1284 @@
+// solar-arc-card.js v4r121
+
+const MDI = {
+  generator:   'M6 3C4.89 3 4 3.9 4 5V16H6V17C6 17.55 6.45 18 7 18H8C8.55 18 9 17.55 9 17V16H15V17C15 17.55 15.45 18 16 18H17C17.55 18 18 17.55 18 17V16H20V5C20 3.9 19.11 3 18 3H6M12 7V5H18V7H12M12 9H18V11H12V9M8 5V9H10L7 15V11H5L8 5M22 20V22H2V20H22Z',
+  tower:       'M8.28,5.45L6.5,4.55L7.76,2H16.23L17.5,4.55L15.72,5.44L15,4H9L8.28,5.45M18.62,8H14.09L13.3,5H10.7L9.91,8H5.38L4.1,10.55L5.89,11.44L6.62,10H17.38L18.1,11.45L19.89,10.56L18.62,8M17.77,22H15.7L15.46,21.1L12,15.9L8.53,21.1L8.3,22H6.23L9.12,11H11.19L10.83,12.35L12,14.1L13.16,12.35L12.81,11H14.88L17.77,22M11.4,15L10.5,13.65L9.32,18.13L11.4,15M14.68,18.12L13.5,13.64L12.6,15L14.68,18.12Z',
+  home:        'M10,20V14H14V20H19V12H22L12,3L2,12H5V20H10Z',
+  sunriseUp:   'M3,12H7A5,5 0 0,1 12,7A5,5 0 0,1 17,12H21A1,1 0 0,1 22,13A1,1 0 0,1 21,14H3A1,1 0 0,1 2,13A1,1 0 0,1 3,12M15,12A3,3 0 0,0 12,9A3,3 0 0,0 9,12H15M12,2L14.39,5.42C13.65,5.15 12.84,5 12,5C11.16,5 10.35,5.15 9.61,5.42L12,2M3.34,7L7.5,6.65C6.9,7.16 6.36,7.78 5.94,8.5C5.5,9.24 5.25,10 5.11,10.79L3.34,7M20.65,7L18.88,10.79C18.74,10 18.47,9.23 18.05,8.5C17.63,7.78 17.1,7.15 16.5,6.64L20.65,7M12.71,16.3L15.82,19.41C16.21,19.8 16.21,20.43 15.82,20.82C15.43,21.21 14.8,21.21 14.41,20.82L12,18.41L9.59,20.82C9.2,21.21 8.57,21.21 8.18,20.82C7.79,20.43 7.79,19.8 8.18,19.41L11.29,16.3C11.5,16.1 11.74,16 12,16C12.26,16 12.5,16.1 12.71,16.3Z',
+  sunsetDown:  'M3,12H7A5,5 0 0,1 12,7A5,5 0 0,1 17,12H21A1,1 0 0,1 22,13A1,1 0 0,1 21,14H3A1,1 0 0,1 2,13A1,1 0 0,1 3,12M15,12A3,3 0 0,0 12,9A3,3 0 0,0 9,12H15M12,2L14.39,5.42C13.65,5.15 12.84,5 12,5C11.16,5 10.35,5.15 9.61,5.42L12,2M3.34,7L7.5,6.65C6.9,7.16 6.36,7.78 5.94,8.5C5.5,9.24 5.25,10 5.11,10.79L3.34,7M20.65,7L18.88,10.79C18.74,10 18.47,9.23 18.05,8.5C17.63,7.78 17.1,7.15 16.5,6.64L20.65,7M12.71,20.71L15.82,17.6C16.21,17.21 16.21,16.57 15.82,16.18C15.43,15.79 14.8,15.79 14.41,16.18L12,18.59L9.59,16.18C9.2,15.79 8.57,15.79 8.18,16.18C7.79,16.57 7.79,17.21 8.18,17.6L11.29,20.71C11.5,20.9 11.74,21 12,21C12.26,21 12.5,20.9 12.71,20.71Z',
+};
+
+const R  = 35;
+const RR = 38;   // INV ring radius (těsně u node r=35)
+const GR = 57;
+
+class SolarArcCard extends HTMLElement {
+  constructor() {
+    super();
+    this.attachShadow({ mode: 'open' });
+    this._timer = null;
+    this._built = false;
+  }
+
+  connectedCallback()    { this._timer = setInterval(() => this._tickSun(), 60000); }
+  disconnectedCallback() { clearInterval(this._timer); }
+
+  setConfig(config) {
+    const arc    = config.arc    || {};
+    const sankey = config.sankey || {};
+
+    this._config = {
+      // ── Arc entity (patří jen k arc vizualizaci) ──────────────────────────
+      // Nová místa: arc.solar_production atd.
+      // Zpětná kompatibilita: top-level solar_production / pv_entity
+      pv_entity:    arc.solar_production  || config.solar_production  || config.pv_entity    || 'sensor.goodwe_pv_power',
+      house_entity: arc.house_consumption || config.house_consumption || config.house_entity || 'sensor.goodwe_house_consumption',
+      grid_entity:  arc.grid_power        || config.grid_power        || config.grid_entity  || 'sensor.goodwe_active_power',
+      sun_entity:   arc.sun_entity        || config.sun_entity        || 'sun.sun',
+
+      // ── Arc sekce ─────────────────────────────────────────────────────────
+      arc_show:             arc.arc_show             !== false,
+      arc_title_show:       arc.arc_title_show        !== false,
+      arc_title_icon:       arc.arc_title_icon        || 'mdi:flash',
+      arc_title_icon_show:  arc.arc_title_icon_show   !== false,
+      arc_title_icon_color: arc.arc_title_icon_color  || '',
+      arc_title_text:       arc.arc_title_text        || 'Aktuální stav',
+      arc_title_text_color: arc.arc_title_text_color  || '',
+
+      // ── Sankey sekce ──────────────────────────────────────────────────────
+      sankey_show:             sankey.sankey_show            !== false,
+      sankey_title_show:       sankey.sankey_title_show       !== false,
+      sankey_title_icon:       sankey.sankey_title_icon       || 'mdi:lightning-bolt',
+      sankey_title_icon_show:  sankey.sankey_title_icon_show  !== false,
+      sankey_title_icon_color: sankey.sankey_title_icon_color || '',
+      sankey_title_text:       sankey.sankey_title_text       || 'Tok energie',
+      sankey_title_text_color: sankey.sankey_title_text_color || '',
+      // sections uvnitř sankey: bloku nebo top-level (legacy)
+      sections: sankey.sections || config.sections || null,
+
+      // ── Legacy sk_* (zpětná kompatibilita) ───────────────────────────────
+      sk_grid:   config.sk_grid   || null,
+      sk_export: config.sk_export || null,
+      sk_l1:     config.sk_l1     || null,
+      sk_l2:     config.sk_l2     || null,
+      sk_l3:     config.sk_l3     || null,
+      sk_inv:    config.sk_inv    || null,
+      sk_pc:     config.sk_pc     || null,
+      sk_tv:     config.sk_tv     || null,
+    };
+    this._built = false;
+  }
+
+  set hass(hass) {
+    this._hass = hass;
+    if (!this._built) { this._buildDOM(); this._built = true; }
+
+    // Spustit _updateDOM jen pokud se změnily naše entity —
+    // hass setter se volá při každé změně stavu v celém HA (i nesouvisejících entit).
+    const pv    = hass.states[this._config.pv_entity]?.state;
+    const house = hass.states[this._config.house_entity]?.state;
+    const grid  = hass.states[this._config.grid_entity]?.state;
+    const sun   = hass.states[this._config.sun_entity]?.last_updated;
+    const skSig = this._config.sections
+      ? this._config.sections.flatMap(s =>
+          (s.entities || []).map(e => hass.states[e.entity_id]?.state ?? '')
+        ).join(',')
+      : ['sk_grid','sk_export','sk_l1','sk_l2','sk_l3','sk_inv','sk_pc','sk_tv']
+          .map(k => this._config[k] ? (hass.states[this._config[k]]?.state ?? '') : '')
+          .join(',');
+
+    if (pv === this._lpv && house === this._lhse &&
+        grid === this._lgrd && sun === this._lsun && skSig === this._lsk) return;
+
+    this._lpv  = pv;
+    this._lhse = house;
+    this._lgrd = grid;
+    this._lsun = sun;
+    this._lsk  = skSig;
+
+    // Throttle: max 1 render za 500 ms (stejný princip jako ha-sankey-chart)
+    const now = Date.now();
+    if (now - (this._lastRender || 0) < 500) {
+      clearTimeout(this._renderTimer);
+      this._renderTimer = setTimeout(() => this._updateDOM(), 500);
+      return;
+    }
+    this._lastRender = now;
+    this._updateDOM();
+  }
+
+  getCardSize() { return 4; }
+
+  _val(id)  { return parseFloat(this._hass?.states[id]?.state ?? 0) || 0; }
+
+  _fmt(w) {
+    const a = Math.abs(w);
+    return a >= 1000 ? `${(a / 1000).toFixed(1)} kW` : `${Math.round(a)} W`;
+  }
+
+  _fmtTime(ms, tz) {
+    try {
+      return new Date(ms).toLocaleTimeString('cs-CZ', {
+        hour: '2-digit', minute: '2-digit', timeZone: tz || 'Europe/Prague',
+      });
+    } catch { return ''; }
+  }
+
+  _isDay() {
+    // Použít elevation místo state — elevation se aktualizuje okamžitě,
+    // zatímco state 'above_horizon' může laggovat až ~2 minuty za skutečným západem/východem.
+    const attrs = this._hass?.states[this._config.sun_entity]?.attributes;
+    if (attrs?.elevation != null) return attrs.elevation > 0;
+    return this._hass?.states[this._config.sun_entity]?.state === 'above_horizon';
+  }
+
+  _getSunT() {
+    if (!this._isDay()) return -1;
+    const { next_rising, next_setting } = this._hass.states[this._config.sun_entity].attributes;
+    const now      = Date.now();
+    const risingMs = new Date(next_rising).getTime() - 86400000; // dnešní východ
+    let   settingMs = new Date(next_setting).getTime();
+    // Guard: HA přepne next_setting na zítřejší západ dříve než změní state →
+    // pokud je západ >20h v budoucnosti, přeskočil na zítřek → odečíst 24h.
+    if (settingMs - now > 72000000) settingMs -= 86400000;
+    return Math.max(0, Math.min(1, (now - risingMs) / (settingMs - risingMs)));
+  }
+
+  _getNightT() {
+    if (this._isDay()) return -1;
+    const { next_rising, next_setting } = this._hass.states[this._config.sun_entity].attributes;
+    const now      = Date.now();
+    let   risingMs = new Date(next_rising).getTime();
+    const settingMs = new Date(next_setting).getTime() - 86400000; // včerejší západ
+    // Guard: symetricky u východu — pokud next_rising přeskočilo na pozítří, odečíst 24h.
+    if (risingMs - now > 72000000) risingMs -= 86400000;
+    if (risingMs <= settingMs) return 0;
+    return Math.max(0, Math.min(1, (now - settingMs) / (risingMs - settingMs)));
+  }
+
+  _qp(t, p0, p1, p2) {
+    const u = 1 - t;
+    return [u*u*p0[0]+2*u*t*p1[0]+t*t*p2[0], u*u*p0[1]+2*u*t*p1[1]+t*t*p2[1]];
+  }
+
+  _arcLen(t, p0, p1, p2) {
+    if (t <= 0) return 0;
+    let len = 0, prev = [...p0];
+    for (let i = 1; i <= 80; i++) {
+      const pt = this._qp(i/80*t, p0, p1, p2);
+      len += Math.hypot(pt[0]-prev[0], pt[1]-prev[1]);
+      prev = pt;
+    }
+    return len;
+  }
+
+  _dur(w) { return 0.4 + 3.1 * (1 - Math.min(Math.abs(w)||0, 9000)/9000); }
+
+  _sunIntensity(pv) {
+    if (pv >= 6000) return { opacity: 1.00, rOuter: 28, rMid: 17, rCore: 9 };
+    if (pv >= 3000) return { opacity: 0.78, rOuter: 22, rMid: 13, rCore: 8 };
+    return              { opacity: 0.55, rOuter: 16, rMid: 10, rCore: 7 };
+  }
+  _f(n)   { return n.toFixed(1); }
+
+  // INV near arc center, GRD/HSE at bottom
+  static get L() {
+    return {
+      A0:  [30, 73], A1: [200, 5], A2: [370, 73],
+      INV: [200, 245],
+      GRD: [70, 175],
+      HSE: [330, 175],
+    };
+  }
+
+  // Orthogonal paths: přímka → 90° oblouček (r=15) → přímka
+  // INV=[200,200] R=35 → bottom exits (195,235) / (205,235)
+  // GRD=[70,330]  R=35 → top entry   (70,295)
+  // HSE=[330,330] R=35 → top entry   (330,295)
+  // Junction level jY=295 (= GRD/HSE top)
+  static get P() {
+    return {
+      toGrid:   'M195,282.7 L195,300 Q195,313 182,313 L83,313 Q70,313 70,300 L70,210',
+      fromGrid: 'M70,210 L70,300 Q70,313 83,313 L182,313 Q195,313 195,300 L195,282.7',
+      toHouse:  'M205,282.7 L205,300 Q205,313 218,313 L317,313 Q330,313 330,300 L330,210',
+    };
+  }
+
+  _edgePt(fx, fy, center) {
+    const dx = fx - center[0], dy = fy - center[1];
+    const d  = Math.hypot(dx, dy) || 1;
+    return [center[0] + (dx/d)*R, center[1] + (dy/d)*R];
+  }
+
+  _nodeSVG(id, cx, cy, iconPath, showVal) {
+    const sc  = 1.167;
+    const ix  = (cx - 14).toFixed(1);
+    const iy  = showVal ? (cy - 18).toFixed(1) : (cy - 14).toFixed(1);
+    const val = showVal ? `
+  <text id="${id}-val" x="${cx}" y="${cy + 19}" text-anchor="middle" class="lbl"
+    font-size="11" font-weight="600" fill="#ffffff" filter="url(#txt-sh)">—</text>` : '';
+    return `
+  <circle id="${id}-glow" cx="${cx}" cy="${cy}" r="${GR}" fill="url(#rg-gry)"/>
+  <circle id="${id}-c" cx="${cx}" cy="${cy}" r="${R}"
+    style="fill:rgba(160,160,165,0.78);stroke:rgba(255,255,255,0.20);stroke-width:1"/>
+  <g id="${id}-icon" transform="translate(${ix},${iy}) scale(${sc})" filter="url(#icon-sh)">
+    <path class="node-path" d="${iconPath}" fill="#ffffff"/>
+  </g>${val}`;
+  }
+
+  // ── Separator HTML helper ─────────────────────────────────────────────────
+  // Vrátí prázdný string pokud show=false (celý separator skrytý).
+  // Ikona: <ha-icon> — funguje v HA kontextu pro libovolné mdi:* ikony.
+  _sepHTML(show, iconShow, icon, iconColor, text, textColor) {
+    if (!show) return '';
+    const iconStyle = `width:18px;height:18px;flex-shrink:0;margin:0 14px 0 4px;opacity:0.75;` +
+                      (iconColor ? `color:${iconColor};` : 'color:var(--text-color,rgba(255,255,255,0.85));');
+    const iconEl = iconShow
+      ? `<ha-icon icon="${icon}" style="${iconStyle}"></ha-icon>`
+      : '';
+    const textStyle = `font-size:13px;font-weight:600;white-space:nowrap;margin:0 30px 0 0;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;` +
+                      (textColor ? `color:${textColor};` : 'color:var(--text-color,rgba(255,255,255,0.85));');
+    return `
+  <div style="display:flex;align-items:center;height:40px;padding:0 14px 0 10px;position:relative;z-index:1;">
+    ${iconEl}
+    <span style="${textStyle}">${text}</span>
+    <div style="flex-grow:1;height:6px;border-radius:6px;opacity:0.6;margin-right:14px;background:var(--bubble-line-background-color,var(--text-color,rgba(255,255,255,0.5)));"></div>
+  </div>`;
+  }
+
+  _buildDOM() {
+    const { INV, GRD, HSE } = SolarArcCard.L;
+    const { toGrid, fromGrid, toHouse } = SolarArcCard.P;
+
+    this.shadowRoot.innerHTML = `
+<style>
+  :host { display:block; }
+
+  .card {
+    background: var(--mod-card-background, rgba(30,30,40,0.05));
+    backdrop-filter: blur(35px) saturate(100%);
+    -webkit-backdrop-filter: blur(35px) saturate(100%);
+    border: 1px solid var(--mod-card-border, rgba(255,255,255,0.08));
+    border-radius: 34px;
+    padding: 6px;
+    position: relative;
+    overflow: hidden;
+    box-shadow:
+      0 15px 25px var(--mod-card-shadow, rgba(0,0,0,0.12)),
+      inset 0 2px 3px var(--mod-card-inset-shadow, rgba(255,255,255,0.02));
+  }
+  .card::before {
+    content:""; position:absolute; inset:0; border-radius:34px;
+    background: linear-gradient(120deg,
+      var(--mod-card-gradient-start, rgba(255,255,255,0.2)),
+      var(--mod-card-gradient-mid,   rgba(255,255,255,0.05)) 25%,
+      var(--mod-card-gradient-end,   rgba(255,255,255,0.01)) 50%,
+      transparent 70%);
+    opacity:0.35; pointer-events:none; z-index:0;
+  }
+
+  svg {
+    width:100%; height:auto; display:block;
+    position:relative; z-index:1; overflow:hidden;
+  }
+
+  #arc-prog {
+    filter: drop-shadow(var(--button-card-icon-shadow, 0 2px 6px rgba(0,0,0,0.7)));
+  }
+
+  .node-path {
+    /* SVG filter #icon-sh handles shadow — CSS filter here as fallback */
+  }
+
+  @keyframes gp { 0%,100%{opacity:0.75} 50%{opacity:1.0} }
+  .gp { animation: gp 2.5s ease-in-out infinite; }
+
+  .prt { --oval-max-op: 0.50; }
+
+  @keyframes sun-outer { 0%,100%{opacity:0.38} 50%{opacity:0.58} }
+  @keyframes sun-inner { 0%,100%{opacity:0.62} 50%{opacity:0.88} }
+  #sun-halo   { animation: sun-outer 4s ease-in-out infinite; }
+  #sun-corona { animation: sun-inner 2.5s ease-in-out infinite; }
+
+  @keyframes twinkle { 0%,100%{opacity:0.15} 50%{opacity:0.95} }
+  .star { animation: twinkle ease-in-out infinite; }
+  @keyframes moon-halo-pulse { 0%,100%{opacity:0.08} 50%{opacity:0.18} }
+  #moon-halo { animation: moon-halo-pulse 5s ease-in-out infinite; }
+
+  @keyframes mo {
+    0%   { offset-distance:0%;   opacity:0; }
+    10%  { offset-distance:10%;  opacity:var(--oval-max-op, 1); }
+    85%  { offset-distance:85%;  opacity:var(--oval-max-op, 1); }
+    100% { offset-distance:100%; opacity:0; }
+  }
+  .oval {
+    offset-distance:0%; offset-rotate:auto;
+    transform-box:fill-box; transform-origin:center;
+    animation:mo linear infinite; visibility:hidden;
+  }
+  .og1 { --oval-max-op: 0.50; }
+  .og2 { --oval-max-op: 0.25; }
+  .og3 { --oval-max-op: 0.10; }
+
+  #inv-ring-solar, #inv-ring-grid {
+    transition: stroke-dasharray 1s ease, stroke-dashoffset 1s ease,
+                stroke 0.5s ease, opacity 0.4s ease;
+  }
+
+  .lbl {
+    font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text','Helvetica Neue',sans-serif;
+  }
+
+  /* ── Sankey SVG — GPU izolace aby nespouštěl repaint backdrop-filter na .card ── */
+  #sk-svg {
+    display:block; width:100%;
+    transform: translateZ(0);
+    will-change: transform;
+    contain: layout style;
+  }
+</style>
+
+<div class="card">
+
+  ${this._sepHTML(this._config.arc_title_show, this._config.arc_title_icon_show, this._config.arc_title_icon, this._config.arc_title_icon_color, this._config.arc_title_text, this._config.arc_title_text_color)}
+
+<svg viewBox="0 0 400 335" xmlns="http://www.w3.org/2000/svg" style="display:${this._config.arc_show ? 'block' : 'none'}">
+  <defs>
+    <linearGradient id="ag" x1="30" y1="0" x2="370" y2="0" gradientUnits="userSpaceOnUse">
+      <stop offset="0"    stop-color="#ffffff" stop-opacity="0"/>
+      <stop offset="0.12" stop-color="#ffffff" stop-opacity="0.55"/>
+      <stop offset="0.5"  stop-color="#ffffff" stop-opacity="1.0"/>
+      <stop offset="0.88" stop-color="#ffffff" stop-opacity="0.55"/>
+      <stop offset="1"    stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+
+    <radialGradient id="rg-org" cx="50%" cy="50%" r="50%">
+      <stop offset="0%"   stop-color="#FF9500" stop-opacity="0"/>
+      <stop offset="53%"  stop-color="#FF9500" stop-opacity="0"/>
+      <stop offset="64%"  stop-color="#FF9500" stop-opacity="0.7"/>
+      <stop offset="84%"  stop-color="#FF9500" stop-opacity="0.18"/>
+      <stop offset="100%" stop-color="#FF9500" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="rg-blu" cx="50%" cy="50%" r="50%">
+      <stop offset="0%"   stop-color="#0084FF" stop-opacity="0"/>
+      <stop offset="53%"  stop-color="#0084FF" stop-opacity="0"/>
+      <stop offset="64%"  stop-color="#0084FF" stop-opacity="0.7"/>
+      <stop offset="84%"  stop-color="#0084FF" stop-opacity="0.18"/>
+      <stop offset="100%" stop-color="#0084FF" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="rg-grn" cx="50%" cy="50%" r="50%">
+      <stop offset="0%"   stop-color="#32D74B" stop-opacity="0"/>
+      <stop offset="53%"  stop-color="#32D74B" stop-opacity="0"/>
+      <stop offset="64%"  stop-color="#32D74B" stop-opacity="0.7"/>
+      <stop offset="84%"  stop-color="#32D74B" stop-opacity="0.18"/>
+      <stop offset="100%" stop-color="#32D74B" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="rg-gry" cx="50%" cy="50%" r="50%">
+      <stop offset="0%"   stop-color="#8E8E93" stop-opacity="0"/>
+      <stop offset="53%"  stop-color="#8E8E93" stop-opacity="0"/>
+      <stop offset="64%"  stop-color="#8E8E93" stop-opacity="0.14"/>
+      <stop offset="84%"  stop-color="#8E8E93" stop-opacity="0.04"/>
+      <stop offset="100%" stop-color="#8E8E93" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="rg-wht" cx="50%" cy="50%" r="50%">
+      <stop offset="0%"   stop-color="#ffffff" stop-opacity="0"/>
+      <stop offset="53%"  stop-color="#ffffff" stop-opacity="0"/>
+      <stop offset="64%"  stop-color="#ffffff" stop-opacity="0.55"/>
+      <stop offset="84%"  stop-color="#ffffff" stop-opacity="0.12"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+
+    <filter id="gd" x="-150%" y="-150%" width="400%" height="400%">
+      <feGaussianBlur stdDeviation="3.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="gi" x="-80%" y="-80%" width="260%" height="260%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="txt-sh" x="-20%" y="-60%" width="140%" height="220%">
+      <feDropShadow dx="0" dy="1" stdDeviation="2" flood-color="#000000" flood-opacity="0.85"/>
+    </filter>
+    <!-- Dark shadow always shown behind icons -->
+    <filter id="icon-sh" x="-80%" y="-80%" width="260%" height="260%">
+      <feDropShadow dx="0" dy="3" stdDeviation="6 6" flood-color="#222222" flood-opacity="0.80"/>
+    </filter>
+    <radialGradient id="sun-grad" cx="50%" cy="50%" r="50%">
+      <stop offset="0%"   stop-color="#FFFDE7"/>
+      <stop offset="45%"  stop-color="#FFD60A"/>
+      <stop offset="100%" stop-color="#FF9500"/>
+    </radialGradient>
+    <filter id="sun-blur-lg" x="-200%" y="-200%" width="500%" height="500%">
+      <feGaussianBlur stdDeviation="11"/>
+    </filter>
+    <filter id="sun-blur-md" x="-150%" y="-150%" width="400%" height="400%">
+      <feGaussianBlur stdDeviation="5"/>
+    </filter>
+    <filter id="sun-blur-sm" x="-80%" y="-80%" width="260%" height="260%">
+      <feGaussianBlur stdDeviation="2" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="cloud-f" x="-50%" y="-100%" width="200%" height="350%">
+      <feGaussianBlur stdDeviation="5"/>
+    </filter>
+    <radialGradient id="moon-grad" cx="38%" cy="32%" r="65%">
+      <stop offset="0%"   stop-color="#E8EEFF"/>
+      <stop offset="100%" stop-color="#7A8BAA"/>
+    </radialGradient>
+    <mask id="moon-mask">
+      <circle cx="0" cy="0" r="11" fill="white"/>
+      <circle cx="6" cy="-4" r="8.5" fill="black"/>
+    </mask>
+    <filter id="moon-glow" x="-120%" y="-120%" width="340%" height="340%">
+      <feGaussianBlur stdDeviation="3" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="ring-glow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="3.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <!-- Trail gradients: transparent at back → opaque at front (objectBoundingBox rotates with element) -->
+    <linearGradient id="lg-sol" x1="0" y1="0" x2="1" y2="0" gradientUnits="objectBoundingBox">
+      <stop offset="0%"   stop-color="#ffd60a" stop-opacity="0"/>
+      <stop offset="100%" stop-color="#ffd60a" stop-opacity="0.65"/>
+    </linearGradient>
+    <linearGradient id="lg-grd" x1="0" y1="0" x2="1" y2="0" gradientUnits="objectBoundingBox">
+      <stop offset="0%"   stop-color="#0084ff" stop-opacity="0"/>
+      <stop offset="100%" stop-color="#0084ff" stop-opacity="0.65"/>
+    </linearGradient>
+    <linearGradient id="lg-imp" x1="0" y1="0" x2="1" y2="0" gradientUnits="objectBoundingBox">
+      <stop offset="0%"   stop-color="#ff453a" stop-opacity="0"/>
+      <stop offset="100%" stop-color="#ff453a" stop-opacity="0.65"/>
+    </linearGradient>
+    <linearGradient id="lg-hse" x1="0" y1="0" x2="1" y2="0" gradientUnits="objectBoundingBox">
+      <stop offset="0%"   stop-color="#ff9500" stop-opacity="0"/>
+      <stop offset="100%" stop-color="#ff9500" stop-opacity="0.65"/>
+    </linearGradient>
+  </defs>
+
+  <!-- ARC -->
+  <path d="M30,73 Q200,5 370,73"
+    fill="none" stroke="rgba(255,255,255,0.12)" stroke-width="3.5" stroke-linecap="round"/>
+  <path id="arc-prog" d="M30,73 Q200,5 370,73"
+    fill="none" stroke="url(#ag)" stroke-width="3.5" stroke-linecap="round"
+    stroke-dasharray="0 9999" opacity="0"/>
+
+  <g transform="translate(${20.6},${63.6}) scale(0.78)" filter="url(#txt-sh)" opacity="0.85">
+    <path d="${MDI.sunriseUp}" fill="rgba(255,255,255,0.92)"/>
+  </g>
+  <g transform="translate(${360.6},${63.6}) scale(0.78)" filter="url(#txt-sh)" opacity="0.55">
+    <path d="${MDI.sunsetDown}" fill="rgba(255,255,255,0.92)"/>
+  </g>
+  <text id="rise-lbl" x="30"  y="91" text-anchor="middle" class="lbl"
+    font-size="10" fill="rgba(255,255,255,0.8)" filter="url(#txt-sh)"/>
+  <text id="set-lbl"  x="370" y="91" text-anchor="middle" class="lbl"
+    font-size="10" fill="rgba(255,255,255,0.8)" filter="url(#txt-sh)"/>
+
+  <!-- SUN / MOON -->
+  <g id="sun-g">
+    <!-- clouds in day sky — blurred circles for fluffy look -->
+    <g opacity="0.58">
+      <animateTransform attributeName="transform" type="translate" values="0,0;4,0;0,0" dur="9s" repeatCount="indefinite"/>
+      <g filter="url(#cloud-f)">
+        <circle cx="78"  cy="44" r="8"  fill="white"/>
+        <circle cx="90"  cy="38" r="12" fill="white"/>
+        <circle cx="104" cy="35" r="14" fill="white"/>
+        <circle cx="118" cy="39" r="11" fill="white"/>
+        <circle cx="130" cy="44" r="8"  fill="white"/>
+      </g>
+    </g>
+    <g opacity="0.48">
+      <animateTransform attributeName="transform" type="translate" values="0,0;-5,0;0,0" dur="13s" repeatCount="indefinite"/>
+      <g filter="url(#cloud-f)">
+        <circle cx="283" cy="50" r="8"  fill="white"/>
+        <circle cx="296" cy="44" r="12" fill="white"/>
+        <circle cx="311" cy="40" r="15" fill="white"/>
+        <circle cx="327" cy="43" r="11" fill="white"/>
+        <circle cx="339" cy="48" r="8"  fill="white"/>
+      </g>
+    </g>
+    <g opacity="0.36">
+      <animateTransform attributeName="transform" type="translate" values="0,0;3,0;0,0" dur="17s" repeatCount="indefinite"/>
+      <g filter="url(#cloud-f)">
+        <circle cx="162" cy="23" r="8"  fill="white"/>
+        <circle cx="174" cy="17" r="10" fill="white"/>
+        <circle cx="187" cy="22" r="7"  fill="white"/>
+      </g>
+    </g>
+    <!-- sun body — translate updated by JS -->
+    <g id="sun-body" transform="translate(200,50)">
+      <circle id="sun-halo"   cx="0" cy="0" r="22" fill="#FF8C00" filter="url(#sun-blur-lg)"/>
+      <circle id="sun-corona" cx="0" cy="0" r="13" fill="#FFD60A" filter="url(#sun-blur-md)"/>
+      <circle id="sun-c"      cx="0" cy="0" r="8"  fill="url(#sun-grad)" filter="url(#sun-blur-sm)"/>
+    </g>
+  </g>
+  <g id="moon-g" display="none">
+    <!-- stars scattered across arc sky -->
+    <circle class="star" cx="75"  cy="45" r="1.3" fill="white" style="animation-duration:3.1s;animation-delay:0.0s"/>
+    <circle class="star" cx="145" cy="23" r="1.0" fill="white" style="animation-duration:2.7s;animation-delay:0.8s"/>
+    <circle class="star" cx="48"  cy="60" r="0.9" fill="white" style="animation-duration:4.0s;animation-delay:0.3s"/>
+    <circle class="star" cx="265" cy="18" r="1.1" fill="white" style="animation-duration:2.4s;animation-delay:1.4s"/>
+    <circle class="star" cx="318" cy="30" r="1.4" fill="white" style="animation-duration:3.7s;animation-delay:0.5s"/>
+    <circle class="star" cx="358" cy="52" r="1.0" fill="white" style="animation-duration:3.3s;animation-delay:1.1s"/>
+    <circle class="star" cx="168" cy="10" r="0.8" fill="white" style="animation-duration:2.9s;animation-delay:2.0s"/>
+    <circle class="star" cx="240" cy="55" r="1.2" fill="white" style="animation-duration:4.5s;animation-delay:0.7s"/>
+    <!-- moon body — translate updated by JS -->
+    <g id="moon-body" transform="translate(200,38)">
+      <circle id="moon-halo" cx="0" cy="0" r="22" fill="rgba(160,185,230,1)"/>
+      <circle cx="0" cy="0" r="11" fill="url(#moon-grad)" mask="url(#moon-mask)" filter="url(#moon-glow)"/>
+    </g>
+  </g>
+
+  <!-- DIM FLOW PATHS -->
+  <path id="p-solar"     d=""          fill="none" stroke="transparent"              stroke-width="5"/>
+  <path id="p-to-grid"   d="${toGrid}"   fill="none" stroke="rgba(255,255,255,0.10)" stroke-width="5"/>
+  <path id="p-from-grid" d="${fromGrid}" fill="none" stroke="transparent"              stroke-width="5"/>
+  <path id="p-to-house"  d="${toHouse}"  fill="none" stroke="rgba(255,255,255,0.10)" stroke-width="5"/>
+
+  <!-- NODES: INV top-center, GRD bottom-left, HSE bottom-right -->
+  ${this._nodeSVG('inv', INV[0], INV[1], MDI.generator, false)}
+  ${this._nodeSVG('grd', GRD[0], GRD[1], MDI.tower,     true)}
+  ${this._nodeSVG('hse', HSE[0], HSE[1], MDI.home,       true)}
+
+  <!-- INV RING: navrch nodů, aby glow/fill node nepřekrýval ringy -->
+  <circle id="inv-ring-bg" cx="${INV[0]}" cy="${INV[1]}" r="38"
+    fill="none" stroke="rgba(255,255,255,0.10)" stroke-width="7"/>
+  <circle id="inv-ring-solar" cx="${INV[0]}" cy="${INV[1]}" r="38"
+    fill="none" stroke="#ffd60a" stroke-width="7" stroke-linecap="round"
+    stroke-dasharray="0 238.8" stroke-dashoffset="0"
+    transform="rotate(-90, ${INV[0]}, ${INV[1]})"
+    filter="url(#ring-glow)" opacity="0"/>
+  <circle id="inv-ring-grid" cx="${INV[0]}" cy="${INV[1]}" r="38"
+    fill="none" stroke="#0084FF" stroke-width="7" stroke-linecap="round"
+    stroke-dasharray="0 238.8" stroke-dashoffset="0"
+    transform="rotate(-90, ${INV[0]}, ${INV[1]})"
+    filter="url(#ring-glow)" opacity="0"/>
+
+  <!-- GHOSTY g3 (nejdál, nejprůhlednější) -->
+  <ellipse id="d-sol-1g3" class="oval og3" rx="4" ry="1.5" fill="#ffd60a" style="offset-path:path('');animation-duration:3.5s;animation-delay:0.24s"/>
+  <ellipse id="d-sol-2g3" class="oval og3" rx="4" ry="1.5" fill="#ffd60a" style="offset-path:path('');animation-duration:3.5s;animation-delay:-1.51s"/>
+  <ellipse id="d-grd-1g3" class="oval og3" rx="4" ry="1.5" fill="#32D74B" style="offset-path:path('${toGrid}');animation-duration:3.5s;animation-delay:0.24s"/>
+  <ellipse id="d-grd-2g3" class="oval og3" rx="4" ry="1.5" fill="#32D74B" style="offset-path:path('${toGrid}');animation-duration:3.5s;animation-delay:-1.51s"/>
+  <ellipse id="d-imp-1g3" class="oval og3" rx="4" ry="1.5" fill="#0a84ff" style="offset-path:path('${fromGrid}');animation-duration:3.5s;animation-delay:0.24s"/>
+  <ellipse id="d-imp-2g3" class="oval og3" rx="4" ry="1.5" fill="#0a84ff" style="offset-path:path('${fromGrid}');animation-duration:3.5s;animation-delay:-1.51s"/>
+  <ellipse id="d-hse-1g3" class="oval og3" rx="4" ry="1.5" fill="#FF9500" style="offset-path:path('${toHouse}');animation-duration:3.5s;animation-delay:0.24s"/>
+  <ellipse id="d-hse-2g3" class="oval og3" rx="4" ry="1.5" fill="#FF9500" style="offset-path:path('${toHouse}');animation-duration:3.5s;animation-delay:-1.51s"/>
+
+  <!-- GHOSTY g2 -->
+  <ellipse id="d-sol-1g2" class="oval og2" rx="5.5" ry="2" fill="#ffd60a" style="offset-path:path('');animation-duration:3.5s;animation-delay:0.16s"/>
+  <ellipse id="d-sol-2g2" class="oval og2" rx="5.5" ry="2" fill="#ffd60a" style="offset-path:path('');animation-duration:3.5s;animation-delay:-1.59s"/>
+  <ellipse id="d-grd-1g2" class="oval og2" rx="5.5" ry="2" fill="#32D74B" style="offset-path:path('${toGrid}');animation-duration:3.5s;animation-delay:0.16s"/>
+  <ellipse id="d-grd-2g2" class="oval og2" rx="5.5" ry="2" fill="#32D74B" style="offset-path:path('${toGrid}');animation-duration:3.5s;animation-delay:-1.59s"/>
+  <ellipse id="d-imp-1g2" class="oval og2" rx="5.5" ry="2" fill="#0084FF" style="offset-path:path('${fromGrid}');animation-duration:3.5s;animation-delay:0.16s"/>
+  <ellipse id="d-imp-2g2" class="oval og2" rx="5.5" ry="2" fill="#0084FF" style="offset-path:path('${fromGrid}');animation-duration:3.5s;animation-delay:-1.59s"/>
+  <ellipse id="d-hse-1g2" class="oval og2" rx="5.5" ry="2" fill="#ff9500" style="offset-path:path('${toHouse}');animation-duration:3.5s;animation-delay:0.16s"/>
+  <ellipse id="d-hse-2g2" class="oval og2" rx="5.5" ry="2" fill="#ff9500" style="offset-path:path('${toHouse}');animation-duration:3.5s;animation-delay:-1.59s"/>
+
+  <!-- GHOSTY g1 (nejblíž hlavě) -->
+  <ellipse id="d-sol-1g1" class="oval og1" rx="6.5" ry="2.2" fill="#ffd60a" style="offset-path:path('');animation-duration:3.5s;animation-delay:0.08s"/>
+  <ellipse id="d-sol-2g1" class="oval og1" rx="6.5" ry="2.2" fill="#ffd60a" style="offset-path:path('');animation-duration:3.5s;animation-delay:-1.67s"/>
+  <ellipse id="d-grd-1g1" class="oval og1" rx="6.5" ry="2.2" fill="#32D74B" style="offset-path:path('${toGrid}');animation-duration:3.5s;animation-delay:0.08s"/>
+  <ellipse id="d-grd-2g1" class="oval og1" rx="6.5" ry="2.2" fill="#32D74B" style="offset-path:path('${toGrid}');animation-duration:3.5s;animation-delay:-1.67s"/>
+  <ellipse id="d-imp-1g1" class="oval og1" rx="6.5" ry="2.2" fill="#0084FF" style="offset-path:path('${fromGrid}');animation-duration:3.5s;animation-delay:0.08s"/>
+  <ellipse id="d-imp-2g1" class="oval og1" rx="6.5" ry="2.2" fill="#0084FF" style="offset-path:path('${fromGrid}');animation-duration:3.5s;animation-delay:-1.67s"/>
+  <ellipse id="d-hse-1g1" class="oval og1" rx="6.5" ry="2.2" fill="#ff9500" style="offset-path:path('${toHouse}');animation-duration:3.5s;animation-delay:0.08s"/>
+  <ellipse id="d-hse-2g1" class="oval og1" rx="6.5" ry="2.2" fill="#ff9500" style="offset-path:path('${toHouse}');animation-duration:3.5s;animation-delay:-1.67s"/>
+
+  <!-- HLAVY -->
+  <ellipse id="d-sol-1" class="oval" rx="7" ry="2.5" fill="#ffd60a" filter="url(#gd)" style="offset-path:path('');animation-duration:3.5s"/>
+  <ellipse id="d-sol-2" class="oval" rx="7" ry="2.5" fill="#ffd60a" filter="url(#gd)" style="offset-path:path('');animation-duration:3.5s;animation-delay:-1.75s"/>
+  <ellipse id="d-grd-1" class="oval" rx="7" ry="2.5" fill="#32D74B" filter="url(#gd)" style="offset-path:path('${toGrid}');animation-duration:3.5s"/>
+  <ellipse id="d-grd-2" class="oval" rx="7" ry="2.5" fill="#32D74B" filter="url(#gd)" style="offset-path:path('${toGrid}');animation-duration:3.5s;animation-delay:-1.75s"/>
+  <ellipse id="d-imp-1" class="oval" rx="7" ry="2.5" fill="#0084FF" filter="url(#gd)" style="offset-path:path('${fromGrid}');animation-duration:3.5s"/>
+  <ellipse id="d-imp-2" class="oval" rx="7" ry="2.5" fill="#0084FF" filter="url(#gd)" style="offset-path:path('${fromGrid}');animation-duration:3.5s;animation-delay:-1.75s"/>
+  <ellipse id="d-hse-1" class="oval" rx="7" ry="2.5" fill="#ff9500" filter="url(#gd)" style="offset-path:path('${toHouse}');animation-duration:3.5s"/>
+  <ellipse id="d-hse-2" class="oval" rx="7" ry="2.5" fill="#ff9500" filter="url(#gd)" style="offset-path:path('${toHouse}');animation-duration:3.5s;animation-delay:-1.75s"/>
+
+  <!-- PARTICLES — translateY shifts perpendicular to path (offset-rotate:auto local space) -->
+  <!-- sol: 8 particles, ±5px / ±8px lateral offset -->
+  <ellipse id="dp-sol-1" class="oval prt" rx="1.5" ry="1.5" fill="#ffd60a" style="offset-path:path('');animation-duration:3.5s;animation-delay:0.53s;transform:translateY(5px)"/>
+  <ellipse id="dp-sol-2" class="oval prt" rx="1.5" ry="1.5" fill="#ffd60a" style="offset-path:path('');animation-duration:3.5s;animation-delay:-1.23s;transform:translateY(-5px)"/>
+  <ellipse id="dp-sol-3" class="oval prt" rx="2.5" ry="0.8" fill="#ffd60a" style="offset-path:path('');animation-duration:3.5s;animation-delay:1.23s;transform:translateY(8px)"/>
+  <ellipse id="dp-sol-4" class="oval prt" rx="2.5" ry="0.8" fill="#ffd60a" style="offset-path:path('');animation-duration:3.5s;animation-delay:-0.53s;transform:translateY(-8px)"/>
+  <ellipse id="dp-sol-5" class="oval prt" rx="1.5" ry="1.5" fill="#ffd60a" style="offset-path:path('');animation-duration:3.5s;animation-delay:1.93s;transform:translateY(5px)"/>
+  <ellipse id="dp-sol-6" class="oval prt" rx="1.5" ry="1.5" fill="#ffd60a" style="offset-path:path('');animation-duration:3.5s;animation-delay:0.18s;transform:translateY(-5px)"/>
+  <ellipse id="dp-sol-7" class="oval prt" rx="2.5" ry="0.8" fill="#ffd60a" style="offset-path:path('');animation-duration:3.5s;animation-delay:2.63s;transform:translateY(8px)"/>
+  <ellipse id="dp-sol-8" class="oval prt" rx="2.5" ry="0.8" fill="#ffd60a" style="offset-path:path('');animation-duration:3.5s;animation-delay:0.88s;transform:translateY(-8px)"/>
+  <!-- grd -->
+  <ellipse id="dp-grd-1" class="oval prt" rx="1.5" ry="1.5" fill="#32D74B" style="offset-path:path('${toGrid}');animation-duration:3.5s;animation-delay:0.53s;transform:translateY(5px)"/>
+  <ellipse id="dp-grd-2" class="oval prt" rx="1.5" ry="1.5" fill="#32D74B" style="offset-path:path('${toGrid}');animation-duration:3.5s;animation-delay:-1.23s;transform:translateY(-5px)"/>
+  <ellipse id="dp-grd-3" class="oval prt" rx="2.5" ry="0.8" fill="#32D74B" style="offset-path:path('${toGrid}');animation-duration:3.5s;animation-delay:1.23s;transform:translateY(8px)"/>
+  <ellipse id="dp-grd-4" class="oval prt" rx="2.5" ry="0.8" fill="#32D74B" style="offset-path:path('${toGrid}');animation-duration:3.5s;animation-delay:-0.53s;transform:translateY(-8px)"/>
+  <ellipse id="dp-grd-5" class="oval prt" rx="1.5" ry="1.5" fill="#32D74B" style="offset-path:path('${toGrid}');animation-duration:3.5s;animation-delay:1.93s;transform:translateY(5px)"/>
+  <ellipse id="dp-grd-6" class="oval prt" rx="1.5" ry="1.5" fill="#32D74B" style="offset-path:path('${toGrid}');animation-duration:3.5s;animation-delay:0.18s;transform:translateY(-5px)"/>
+  <ellipse id="dp-grd-7" class="oval prt" rx="2.5" ry="0.8" fill="#32D74B" style="offset-path:path('${toGrid}');animation-duration:3.5s;animation-delay:2.63s;transform:translateY(8px)"/>
+  <ellipse id="dp-grd-8" class="oval prt" rx="2.5" ry="0.8" fill="#32D74B" style="offset-path:path('${toGrid}');animation-duration:3.5s;animation-delay:0.88s;transform:translateY(-8px)"/>
+  <!-- imp -->
+  <ellipse id="dp-imp-1" class="oval prt" rx="1.5" ry="1.5" fill="#0084FF" style="offset-path:path('${fromGrid}');animation-duration:3.5s;animation-delay:0.53s;transform:translateY(5px)"/>
+  <ellipse id="dp-imp-2" class="oval prt" rx="1.5" ry="1.5" fill="#0084FF" style="offset-path:path('${fromGrid}');animation-duration:3.5s;animation-delay:-1.23s;transform:translateY(-5px)"/>
+  <ellipse id="dp-imp-3" class="oval prt" rx="2.5" ry="0.8" fill="#0084FF" style="offset-path:path('${fromGrid}');animation-duration:3.5s;animation-delay:1.23s;transform:translateY(8px)"/>
+  <ellipse id="dp-imp-4" class="oval prt" rx="2.5" ry="0.8" fill="#0084FF" style="offset-path:path('${fromGrid}');animation-duration:3.5s;animation-delay:-0.53s;transform:translateY(-8px)"/>
+  <ellipse id="dp-imp-5" class="oval prt" rx="1.5" ry="1.5" fill="#0084FF" style="offset-path:path('${fromGrid}');animation-duration:3.5s;animation-delay:1.93s;transform:translateY(5px)"/>
+  <ellipse id="dp-imp-6" class="oval prt" rx="1.5" ry="1.5" fill="#0084FF" style="offset-path:path('${fromGrid}');animation-duration:3.5s;animation-delay:0.18s;transform:translateY(-5px)"/>
+  <ellipse id="dp-imp-7" class="oval prt" rx="2.5" ry="0.8" fill="#0084FF" style="offset-path:path('${fromGrid}');animation-duration:3.5s;animation-delay:2.63s;transform:translateY(8px)"/>
+  <ellipse id="dp-imp-8" class="oval prt" rx="2.5" ry="0.8" fill="#0084FF" style="offset-path:path('${fromGrid}');animation-duration:3.5s;animation-delay:0.88s;transform:translateY(-8px)"/>
+  <!-- hse -->
+  <ellipse id="dp-hse-1" class="oval prt" rx="1.5" ry="1.5" fill="#ff9500" style="offset-path:path('${toHouse}');animation-duration:3.5s;animation-delay:0.53s;transform:translateY(5px)"/>
+  <ellipse id="dp-hse-2" class="oval prt" rx="1.5" ry="1.5" fill="#ff9500" style="offset-path:path('${toHouse}');animation-duration:3.5s;animation-delay:-1.23s;transform:translateY(-5px)"/>
+  <ellipse id="dp-hse-3" class="oval prt" rx="2.5" ry="0.8" fill="#ff9500" style="offset-path:path('${toHouse}');animation-duration:3.5s;animation-delay:1.23s;transform:translateY(8px)"/>
+  <ellipse id="dp-hse-4" class="oval prt" rx="2.5" ry="0.8" fill="#ff9500" style="offset-path:path('${toHouse}');animation-duration:3.5s;animation-delay:-0.53s;transform:translateY(-8px)"/>
+  <ellipse id="dp-hse-5" class="oval prt" rx="1.5" ry="1.5" fill="#ff9500" style="offset-path:path('${toHouse}');animation-duration:3.5s;animation-delay:1.93s;transform:translateY(5px)"/>
+  <ellipse id="dp-hse-6" class="oval prt" rx="1.5" ry="1.5" fill="#ff9500" style="offset-path:path('${toHouse}');animation-duration:3.5s;animation-delay:0.18s;transform:translateY(-5px)"/>
+  <ellipse id="dp-hse-7" class="oval prt" rx="2.5" ry="0.8" fill="#ff9500" style="offset-path:path('${toHouse}');animation-duration:3.5s;animation-delay:2.63s;transform:translateY(8px)"/>
+  <ellipse id="dp-hse-8" class="oval prt" rx="2.5" ry="0.8" fill="#ff9500" style="offset-path:path('${toHouse}');animation-duration:3.5s;animation-delay:0.88s;transform:translateY(-8px)"/>
+
+  <!-- SUN PILL — navrch všeho (z-order) -->
+  <g id="sun-pill" opacity="0">
+    <foreignObject x="0" y="0" width="80" height="26">
+      <div xmlns="http://www.w3.org/1999/xhtml" style="
+        width:100%;height:100%;border-radius:13px;box-sizing:border-box;
+        background:var(--button-card-background,rgba(255,255,255,0.5));
+        backdrop-filter:blur(20px) saturate(180%);
+        -webkit-backdrop-filter:blur(20px) saturate(180%);
+        border:1px solid var(--button-card-border,rgba(200,200,255,0.3));
+        display:flex;align-items:center;justify-content:center;
+      ">
+        <span id="sun-pill-txt" style="
+          font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',sans-serif;
+          font-size:11px;font-weight:700;
+          color:#ffffff;
+          text-shadow:0 1px 3px rgba(0,0,0,0.85);
+          white-space:nowrap;
+        ">—</span>
+      </div>
+    </foreignObject>
+  </g>
+
+</svg>
+
+  ${this._sepHTML(this._config.sankey_title_show, this._config.sankey_title_icon_show, this._config.sankey_title_icon, this._config.sankey_title_icon_color, this._config.sankey_title_text, this._config.sankey_title_text_color)}
+
+  <!-- Sankey SVG — všechny elementy pre-alokované, update pouze přes setAttribute -->
+  <svg id="sk-svg" viewBox="0 0 400 250" xmlns="http://www.w3.org/2000/svg" style="display:${this._config.sankey_show ? 'block' : 'none'}">
+    <defs id="sk-defs">
+      <!-- Static only — dynamic gradients added by _renderSankey -->
+      <filter id="sk-sh" x="-20%" y="-60%" width="140%" height="220%">
+        <feDropShadow dx="0" dy="1" stdDeviation="1.5" flood-color="#000" flood-opacity="0.9"/>
+      </filter>
+    </defs>
+    <g id="sk-flows"/>
+    <g id="sk-glows"/>
+    <g id="sk-nodes"/>
+    <g id="sk-labels"/>
+  </svg>
+
+</div>`;
+  }
+
+  _updateDOM() {
+    const sr = this.shadowRoot;
+    if (!sr.querySelector('#arc-prog')) return;
+
+    const pv    = this._val(this._config.pv_entity);
+    const house = this._val(this._config.house_entity);
+    const grid  = this._val(this._config.grid_entity);
+    const tz    = this._hass.config?.time_zone;
+    const sunAttrs = this._hass.states[this._config.sun_entity]?.attributes || {};
+    const isDay  = this._isDay();
+    const sunT   = isDay ? this._getSunT() : -1;
+    const isProd = pv > 20;
+    const isExport = grid > 10;
+    const isImport = grid < -10;
+    const solColor  = isDay ? '#ffd60a' : '#8EACCD';
+    const solStroke = 'rgba(255,255,255,0.12)';
+    const solIds = ['#d-sol-1','#d-sol-2','#d-sol-1g1','#d-sol-2g1','#d-sol-1g2','#d-sol-2g2','#d-sol-1g3','#d-sol-2g3'];
+
+    const L = SolarArcCard.L;
+    const f = n => this._f(n);
+
+    sr.querySelector('#sun-g').style.display  = isDay ? 'block' : 'none';
+    sr.querySelector('#moon-g').style.display = isDay ? 'none' : 'block';
+
+    if (!isDay) {
+      sr.querySelector('#arc-prog').setAttribute('opacity', '0');
+      const nightT  = this._getNightT();
+      const moonArcT = nightT >= 0 ? nightT : 0;
+      const mp = this._qp(moonArcT, L.A0, L.A1, L.A2);
+      const mx = f(mp[0]), my = f(mp[1]);
+      sr.querySelector('#moon-body').setAttribute('transform', `translate(${mx},${my})`);
+
+      if (isProd) {
+        const ex = f(L.INV[0]), ey = f(L.INV[1] - RR);
+        const midY = f((mp[1] + L.INV[1] - RR) / 2);
+        const moonPath = `M${mx},${my} C${mx},${midY} ${ex},${midY} ${ex},${ey}`;
+        sr.querySelector('#p-solar').setAttribute('d', moonPath);
+        sr.querySelector('#p-solar').style.stroke = solStroke;
+        solIds.forEach(id => { const e = sr.querySelector(id); if (e) { e.style.offsetPath = `path('${moonPath}')`; e.setAttribute('fill', solColor); } });
+        this._setParticles(sr, 'sol', solColor, true, this._dur(pv), moonPath);
+      } else {
+        sr.querySelector('#p-solar').setAttribute('d', '');
+        sr.querySelector('#p-solar').style.stroke = 'transparent';
+        this._setParticles(sr, 'sol', solColor, false, this._dur(pv));
+      }
+    }
+
+    if (isDay) {
+      const sp = this._qp(sunT, L.A0, L.A1, L.A2);
+      const sx = f(sp[0]), sy = f(sp[1]);
+
+      sr.querySelector('#sun-body').setAttribute('transform', `translate(${sx},${sy})`);
+
+      const si = isProd ? this._sunIntensity(pv) : { opacity: 0.28, rOuter: 14, rMid: 9, rCore: 6 };
+      sr.querySelector('#sun-body').style.opacity = `${si.opacity}`;
+      sr.querySelector('#sun-halo').setAttribute('r',   si.rOuter);
+      sr.querySelector('#sun-corona').setAttribute('r', si.rMid);
+      const sc = sr.querySelector('#sun-c');
+      sc.setAttribute('r',    si.rCore);
+      sc.setAttribute('fill', isProd ? 'url(#sun-grad)' : 'rgba(255,214,10,0.5)');
+
+      const pill = sr.querySelector('#sun-pill');
+      const pillX = sp[0] + 94 > 390 ? sp[0] - 94 : sp[0] + 14;
+      pill.setAttribute('transform', `translate(${f(pillX)},${f(sp[1]-16)})`);
+      pill.setAttribute('opacity', '1');
+      sr.querySelector('#sun-pill-txt').textContent =
+        this._fmt(pv);
+
+      const prog = this._arcLen(sunT, L.A0, L.A1, L.A2);
+      const ap = sr.querySelector('#arc-prog');
+      ap.setAttribute('stroke-dasharray', `${f(prog)} 9999`);
+      ap.setAttribute('opacity', isDay ? '0.9' : '0');
+
+      const ex        = f(L.INV[0]), ey = f(L.INV[1] - RR);
+      const midY      = f((sp[1] + L.INV[1] - RR) / 2);
+      const solarPath = `M${sx},${sy} C${sx},${midY} ${ex},${midY} ${ex},${ey}`;
+      sr.querySelector('#p-solar').setAttribute('d', solarPath);
+      sr.querySelector('#p-solar').style.stroke = isProd ? solStroke : 'transparent';
+      solIds.forEach(id => { const e = sr.querySelector(id); if (e) { e.style.offsetPath = `path('${solarPath}')`; e.setAttribute('fill', solColor); } });
+      this._setParticles(sr, 'sol', solColor, isProd, this._dur(pv), solarPath);
+    }
+
+    if (sunAttrs.next_rising && sunAttrs.next_setting) {
+      const rising  = new Date(sunAttrs.next_rising).getTime();
+      const setting = new Date(sunAttrs.next_setting).getTime();
+      if (isDay) {
+        sr.querySelector('#rise-lbl').textContent = this._fmtTime(rising - 86400000, tz);
+        sr.querySelector('#set-lbl').textContent  = this._fmtTime(setting, tz);
+      } else {
+        sr.querySelector('#rise-lbl').textContent = this._fmtTime(setting - 86400000, tz);
+        sr.querySelector('#set-lbl').textContent  = this._fmtTime(rising, tz);
+      }
+    }
+
+    this._setFlow(sr, ['#d-sol-1','#d-sol-2'], isProd,     this._dur(pv));
+    this._setFlow(sr, ['#d-grd-1','#d-grd-2'], isExport,   this._dur(grid));
+    this._setFlow(sr, ['#d-imp-1','#d-imp-2'], isImport,   this._dur(grid));
+    this._setFlow(sr, ['#d-hse-1','#d-hse-2'], house > 20, this._dur(house));
+
+    this._setParticles(sr, 'grd', '#32D74B', isExport,   this._dur(grid));
+    this._setParticles(sr, 'imp', '#0084FF', isImport,   this._dur(grid));
+    this._setParticles(sr, 'hse', '#FF9500', house > 20, this._dur(house));
+
+    sr.querySelector('#p-from-grid').style.stroke = isImport ? 'rgba(255,255,255,0.12)' : 'transparent';
+    sr.querySelector('#p-to-grid').style.stroke   = 'rgba(255,255,255,0.12)';
+    sr.querySelector('#p-to-house').style.stroke  = 'rgba(255,255,255,0.12)';
+
+    const invFill = isDay ? 'rgba(255,155,50,0.90)' : 'rgba(80,170,255,0.90)';
+    const invGrad = isDay ? 'rg-org' : 'rg-blu';
+    this._nodeUpdate(sr, 'inv', isProd, invFill, invGrad, null);
+    // Glow přebírá ring — potlačit glow na inv uzlu (+ strhnout gp animaci, která by přebila opacity)
+    const invGlow = sr.querySelector('#inv-glow');
+    invGlow.classList.remove('gp');
+    invGlow.style.opacity = '0';
+
+    // ── INV RING: kruhový graf solár vs grid-import ──────────────────
+    const RC       = 238.76; // 2π × 38
+    const pvPow    = Math.max(0, pv);
+    const impPow   = Math.max(0, -grid);
+    const totSrc   = pvPow + impPow;
+    const sFrac    = totSrc > 20 ? pvPow / totSrc : (isProd ? 1 : 0);
+    const gFrac    = 1 - sFrac;
+    const hasTwo   = sFrac > 0.02 && gFrac > 0.02;
+    const gap      = hasTwo ? 4 : 0;
+    const sLen     = Math.max(0, RC * sFrac - gap).toFixed(1);
+    const gLen     = Math.max(0, RC * gFrac - gap).toFixed(1);
+    const gOff     = (-(RC * sFrac)).toFixed(1);
+
+    const ringSolar = sr.querySelector('#inv-ring-solar');
+    const ringGrid  = sr.querySelector('#inv-ring-grid');
+
+    ringSolar.setAttribute('stroke', solColor);
+    ringSolar.setAttribute('stroke-dasharray', `${sLen} ${RC.toFixed(1)}`);
+    ringSolar.setAttribute('stroke-dashoffset', '0');
+    ringSolar.style.opacity = sFrac > 0.02 ? '0.92' : '0';
+
+    ringGrid.setAttribute('stroke', isImport ? '#0084FF' : '#32D74B');
+    ringGrid.setAttribute('stroke-dasharray', `${gLen} ${RC.toFixed(1)}`);
+    ringGrid.setAttribute('stroke-dashoffset', gOff);
+    ringGrid.style.opacity = gFrac > 0.02 ? '0.85' : '0';
+
+    const gFill = isImport ? 'rgba(80,170,255,0.90)' : isExport ? 'rgba(100,220,130,0.90)' : 'rgba(160,160,165,0.78)';
+    const gGrad = isImport ? 'rg-blu' : isExport ? 'rg-grn' : 'rg-gry';
+    const gLabel = isImport ? `← ${this._fmt(Math.abs(grid))}` :
+                   isExport ? `→ ${this._fmt(Math.abs(grid))}` :
+                   this._fmt(Math.abs(grid));
+    this._nodeUpdate(sr, 'grd', isImport || isExport, gFill, gGrad, gLabel);
+    this._nodeUpdate(sr, 'hse', house > 20, 'rgba(255,155,50,0.90)', 'rg-org', this._fmt(house));
+
+    this._updateSankey(sr, pv, grid, house);
+  }
+
+  _hexA(hex, a) {
+    const r = parseInt(hex.slice(1,3),16);
+    const g = parseInt(hex.slice(3,5),16);
+    const b = parseInt(hex.slice(5,7),16);
+    return `rgba(${r},${g},${b},${a})`;
+  }
+
+  // ── _updateSankey: dispatcher ────────────────────────────────────────────
+  _updateSankey(sr, pvIn, gridIn, houseIn) {
+    const sects = this._config.sections
+      ? this._config.sections
+      : this._buildLegacySections(pvIn, gridIn, houseIn);
+    this._renderSankey(sr, sects);
+  }
+
+  // ── _buildLegacySections: translate sk_* config → sections array ─────────
+  _buildLegacySections(pvIn, gridIn, houseIn) {
+    const cfg = this._config;
+    const pvPow  = Math.max(0, pvIn);
+    const skGrdV = cfg.sk_grid ? this._val(cfg.sk_grid) : null;
+    const impPow = skGrdV !== null ? Math.max(0, skGrdV) : Math.max(0, -gridIn);
+    const expPow = cfg.sk_export && this._val(cfg.sk_export) > 0
+      ? this._val(cfg.sk_export)
+      : skGrdV !== null ? Math.max(0, -skGrdV) : Math.max(0, gridIn);
+    const l1Pow  = cfg.sk_l1  ? Math.max(0, this._val(cfg.sk_l1))  : 0;
+    const l2Pow  = cfg.sk_l2  ? Math.max(0, this._val(cfg.sk_l2))  : 0;
+    const l3Pow  = cfg.sk_l3  ? Math.max(0, this._val(cfg.sk_l3))  : 0;
+    const invPow = cfg.sk_inv ? Math.max(0, this._val(cfg.sk_inv)) : 0;
+    const pcPow  = cfg.sk_pc  ? Math.max(0, this._val(cfg.sk_pc))  : 0;
+    const tvPow  = cfg.sk_tv  ? Math.max(0, this._val(cfg.sk_tv))  : 0;
+    const useDetail = (l1Pow + l2Pow + l3Pow + invPow + pcPow + tvPow) > 0;
+    const l1Tot    = Math.max(l1Pow, pcPow + tvPow);
+    const houseTot = useDetail
+      ? Math.max(houseIn, l1Tot + l2Pow + l3Pow + invPow)
+      : houseIn;
+
+    const e = (id, name, col, val, children) =>
+      ({ entity_id: id, name, color: col, _v: val, ...(children ? { children } : {}) });
+
+    if (useDetail) {
+      const sects = [
+        { entities: [
+          e('_pv_',  'Solár',  '#FFD60A', pvPow,   ['_hse_', '_exp_']),
+          e('_grd_', 'Síť',    '#007AFF', impPow,  ['_hse_']),
+        ]},
+        { entities: [
+          e('_hse_', 'Dům',    '#FF9500', houseTot, ['_l1_','_l2_','_l3_','_inv_']),
+          e('_exp_', 'Přetok', '#30D158', expPow),
+        ]},
+        { entities: [
+          e('_l1_',  'L1',      '#5AC8FA', l1Tot,  pcPow+tvPow>0 ? ['_pc_','_tv_'] : undefined),
+          e('_l2_',  'L2',      '#5AC8FA', l2Pow),
+          e('_l3_',  'L3',      '#5AC8FA', l3Pow),
+          e('_inv_', 'Střídač', '#5AC8FA', invPow),
+        ]},
+      ];
+      if (pcPow + tvPow > 0) sects.push({ entities: [
+        e('_pc_', 'PC', '#32ADE6', pcPow),
+        e('_tv_', 'TV', '#32ADE6', tvPow),
+      ]});
+      return sects;
+    }
+    return [
+      { entities: [
+        e('_pv_',  'Solár',  '#FFD60A', pvPow,   ['_hse_', '_exp_']),
+        e('_grd_', 'Síť',    '#007AFF', impPow,  ['_hse_']),
+      ]},
+      { entities: [
+        e('_hse_', 'Dům',    '#FF9500', houseTot),
+        e('_exp_', 'Přetok', '#30D158', expPow),
+      ]},
+    ];
+  }
+
+  // ── _renderSankey: dynamic renderer for any sections array ───────────────
+  _renderSankey(sr, sections) {
+    const skSvg = sr.querySelector('#sk-svg');
+    if (!skSvg || !sections?.length) return;
+
+    const NS  = 'http://www.w3.org/2000/svg';
+    const NW = 11, GAP = 7, PAD_T = 18, PAD_B = 14, SVG_H = 250;
+    const avH = SVG_H - PAD_T - PAD_B;   // 218 px
+    const N   = sections.length;
+    const ff  = v => v.toFixed(1);
+
+    // ── Clear dynamic content ──
+    const fG   = skSvg.querySelector('#sk-flows');
+    const glG  = skSvg.querySelector('#sk-glows');
+    const nG   = skSvg.querySelector('#sk-nodes');
+    const lG   = skSvg.querySelector('#sk-labels');
+    const defs = skSvg.querySelector('#sk-defs');
+    if (!fG) return;
+    [fG, glG, nG, lG].forEach(g => { while (g.firstChild) g.removeChild(g.firstChild); });
+    [...defs.querySelectorAll('linearGradient')].forEach(el => el.remove());
+
+    // ── Column x centers (spread 50…365) ──
+    const COLS = N === 1 ? [207]
+      : sections.map((_, i) => Math.round(50 + i * (365 - 50) / (N - 1)));
+
+    // ── Entity registry ──
+    const entMap = {}, colOf = {};
+    sections.forEach((sec, ci) => {
+      (sec.entities || []).forEach(ent => {
+        entMap[ent.entity_id] = ent;
+        colOf[ent.entity_id]  = ci;
+      });
+    });
+
+    // ── Node values ──
+    const nVal     = {};
+    const deferred = [];
+    sections.forEach(sec => {
+      (sec.entities || []).forEach(ent => {
+        const eid = ent.entity_id;
+        if (ent.type === 'remaining_parent_state') {
+          deferred.push(eid); nVal[eid] = 0;
+        } else {
+          nVal[eid] = Math.max(0,
+            ent._v !== undefined ? ent._v
+              : parseFloat(this._hass?.states[eid]?.state || 0) || 0
+          );
+        }
+      });
+    });
+    // Resolve remaining_parent_state: parent value − non-deferred siblings
+    deferred.forEach(eid => {
+      let pv = 0, sib = 0;
+      for (const [pid, pe] of Object.entries(entMap)) {
+        if (pe.children?.includes(eid)) {
+          pv = nVal[pid];
+          (pe.children || []).forEach(cid => {
+            if (cid !== eid && !deferred.includes(cid)) sib += nVal[cid] || 0;
+          });
+          break;
+        }
+      }
+      nVal[eid] = Math.max(0, pv - sib);
+    });
+
+    // ── Scale: tallest column fits in avH ──
+    const scArr = sections.map(sec => {
+      const active = (sec.entities || []).filter(e => nVal[e.entity_id] > 0);
+      if (!active.length) return Infinity;
+      const sumW  = active.reduce((a, e) => a + nVal[e.entity_id], 0);
+      const gapsH = (active.length - 1) * GAP;
+      return sumW > 0 ? (avH - gapsH) / sumW : Infinity;
+    }).filter(s => isFinite(s) && s > 0);
+    const S  = scArr.length ? Math.min(...scArr) : 1;
+    const nh = v => v > 0 ? Math.max(2, v * S) : 0;
+
+    // ── Node Y positions ──
+    const nY = {}, nH = {};
+    sections.forEach(sec => {
+      let y = PAD_T;
+      (sec.entities || []).forEach(ent => {
+        const h = nh(nVal[ent.entity_id]);
+        nY[ent.entity_id] = y; nH[ent.entity_id] = h;
+        if (h >= 2) y += h + GAP;
+      });
+    });
+    // Column alignment: if all entities in a column share exactly one parent → align with parent ──
+    for (let ci = 1; ci < N; ci++) {
+      const colEnts = sections[ci].entities || [];
+      const parents = new Set();
+      colEnts.forEach(ent => {
+        Object.entries(entMap).forEach(([pid, pe]) => {
+          if (colOf[pid] < ci && pe.children?.includes(ent.entity_id)) parents.add(pid);
+        });
+      });
+      if (parents.size === 1) {
+        const pid = [...parents][0];
+        let y = nY[pid];
+        colEnts.forEach(ent => {
+          const h = nh(nVal[ent.entity_id]);
+          nY[ent.entity_id] = y; nH[ent.entity_id] = h;
+          if (h >= 2) y += h + GAP;
+        });
+      }
+    }
+
+    // ── Flow values (sequential fill: top parent fills first) ──
+    const srcUsed = {};
+    Object.keys(nVal).forEach(eid => { srcUsed[eid] = 0; });
+    const flowList = [];
+    sections.forEach((sec, ci) => {
+      if (ci === 0) return;
+      (sec.entities || []).forEach(tgtEnt => {
+        const tgtId = tgtEnt.entity_id;
+        let remaining = nVal[tgtId];
+        if (remaining <= 0) return;
+        for (let pci = 0; pci < ci; pci++) {
+          (sections[pci].entities || []).forEach(srcEnt => {
+            if (!srcEnt.children?.includes(tgtId)) return;
+            if (remaining <= 0) return;
+            const srcId = srcEnt.entity_id;
+            const avail = nVal[srcId] - srcUsed[srcId];
+            const fv    = Math.min(avail, remaining);
+            if (fv > 0) {
+              flowList.push({ from: srcId, to: tgtId, value: fv });
+              srcUsed[srcId] += fv; remaining -= fv;
+            }
+          });
+        }
+      });
+    });
+
+    // ── Helpers ──
+    const getCol  = eid => this._cssColor(entMap[eid]?.color) || '#5AC8FA';
+    let   gIdx    = 0;
+    const mkGrad  = (id, stops) => {
+      const g = document.createElementNS(NS, 'linearGradient');
+      g.setAttribute('id', id);
+      g.setAttribute('x1','0%'); g.setAttribute('y1','0%');
+      g.setAttribute('x2','100%'); g.setAttribute('y2','0%');
+      stops.forEach(([off, col, op]) => {
+        const s = document.createElementNS(NS, 'stop');
+        s.setAttribute('offset', off);
+        s.setAttribute('stop-color', col);
+        s.setAttribute('stop-opacity', String(op));
+        g.appendChild(s);
+      });
+      defs.appendChild(g); return id;
+    };
+    const bb = (xa, y1t, y1b, xb, y2t, y2b) => {
+      const mx = xa+(xb-xa)*0.55, mx2 = xa+(xb-xa)*0.45;
+      return `M${xa},${y1t} C${mx},${y1t} ${mx2},${y2t} ${xb},${y2t} `
+           + `L${xb},${y2b} C${mx2},${y2b} ${mx},${y1b} ${xa},${y1b} Z`;
+    };
+
+    // ── Draw flows ──
+    const srcOff = {}, tgtOff = {};
+    Object.keys(nVal).forEach(eid => { srcOff[eid] = 0; tgtOff[eid] = 0; });
+    flowList.forEach(fl => {
+      const fh = nh(fl.value);
+      if (fh < 1) return;
+      const xa  = COLS[colOf[fl.from]] + NW/2;
+      const xb  = COLS[colOf[fl.to]]   - NW/2;
+      const y1t = nY[fl.from] + srcOff[fl.from];
+      const y2t = nY[fl.to]   + tgtOff[fl.to];
+      srcOff[fl.from] += fh; tgtOff[fl.to] += fh;
+      const cSrc = getCol(fl.from), cTgt = getCol(fl.to);
+      const gid  = mkGrad(`sk-fg-${gIdx++}`, [['0%',cSrc,0.50],['100%',cTgt,0.40]]);
+      const p = document.createElementNS(NS, 'path');
+      p.setAttribute('d', bb(xa, y1t, y1t+fh, xb, y2t, y2t+fh));
+      p.setAttribute('fill', `url(#${gid})`);
+      fG.appendChild(p);
+    });
+
+    // ── Draw nodes ──
+    const GW = 25;
+    sections.forEach((sec, ci) => {
+      const cx = COLS[ci];
+      (sec.entities || []).forEach(ent => {
+        const eid = ent.entity_id, h = nH[eid], y = nY[eid];
+        if (h < 2) return;
+        const col = getCol(eid);
+        // glow
+        const ggid = `sk-gg-${gIdx++}`;
+        mkGrad(ggid, [['0%',col,0],['28%',col,0.32],['72%',col,0.32],['100%',col,0]]);
+        const gr = document.createElementNS(NS, 'rect');
+        gr.setAttribute('x', ff(cx-GW/2)); gr.setAttribute('y', ff(y));
+        gr.setAttribute('width', ff(GW));  gr.setAttribute('height', ff(h));
+        gr.setAttribute('rx', '7');
+        gr.setAttribute('fill', `url(#${ggid})`);
+        glG.appendChild(gr);
+        // body
+        const rb = document.createElementNS(NS, 'rect');
+        rb.setAttribute('x', ff(cx-NW/2)); rb.setAttribute('y', ff(y));
+        rb.setAttribute('width', ff(NW));  rb.setAttribute('height', ff(h));
+        rb.setAttribute('rx', '5.5');
+        rb.setAttribute('fill',         this._hexA(col, 0.82));
+        rb.setAttribute('stroke',       this._hexA(col, 1.0));
+        rb.setAttribute('stroke-width', '1.2');
+        nG.appendChild(rb);
+      });
+    });
+
+    // ── Draw labels ──
+    const fsN  = N > 2 ? '8' : '10';
+    const fsV  = N > 2 ? '7' : '9';
+    const FONT = "-apple-system,BlinkMacSystemFont,'SF Pro Text',sans-serif";
+    const mkT  = (text, x, y, fs, fw, fill) => {
+      const t = document.createElementNS(NS, 'text');
+      t.setAttribute('x', ff(x)); t.setAttribute('y', ff(y));
+      t.setAttribute('font-size', fs); t.setAttribute('font-weight', fw);
+      t.setAttribute('font-family', FONT); t.setAttribute('fill', fill);
+      t.setAttribute('filter', 'url(#sk-sh)');
+      t.textContent = text; return t;
+    };
+    sections.forEach((sec, ci) => {
+      const cx    = COLS[ci];
+      const right  = ci > (N - 1) / 2;
+      const xOff   = right ? cx + NW/2 + 5 : cx - NW/2 - 5;
+      const anchor = right ? 'start' : 'end';
+      (sec.entities || []).forEach(ent => {
+        const eid = ent.entity_id, h = nH[eid], y = nY[eid];
+        if (h < 2) return;
+        const cy = y + h / 2;
+        const tN = mkT(ent.name || eid, xOff, cy-3.5, fsN, '600', 'rgba(255,255,255,0.90)');
+        tN.setAttribute('text-anchor', anchor);
+        const tV = mkT(this._fmt(nVal[eid]), xOff, cy+5.5, fsV, '400', 'rgba(255,255,255,0.50)');
+        tV.setAttribute('text-anchor', anchor);
+        lG.appendChild(tN); lG.appendChild(tV);
+      });
+    });
+  }
+
+  // ── _cssColor: CSS color name / hex → 6-char lowercase hex ─────────────
+  _cssColor(colorStr) {
+    if (!colorStr) return null;
+    const s = String(colorStr).trim();
+    if (/^#[0-9a-fA-F]{6}$/.test(s)) return s.toLowerCase();
+    if (/^#[0-9a-fA-F]{3}$/.test(s)) {
+      const [, a, b, c] = s;
+      return `#${a}${a}${b}${b}${c}${c}`.toLowerCase();
+    }
+    try {
+      const cv = document.createElement('canvas');
+      cv.width = cv.height = 1;
+      const ctx = cv.getContext('2d');
+      ctx.fillStyle = s;
+      ctx.fillRect(0, 0, 1, 1);
+      const [r, g, b] = ctx.getImageData(0, 0, 1, 1).data;
+      return `#${r.toString(16).padStart(2,'0')}${g.toString(16).padStart(2,'0')}${b.toString(16).padStart(2,'0')}`;
+    } catch { return null; }
+  }
+
+
+  _nodeUpdate(sr, id, active, color, gradId, valText) {
+    const grayColor = 'rgba(160,160,165,0.78)';
+
+    const glow = sr.querySelector(`#${id}-glow`);
+    glow.setAttribute('fill', `url(#${active ? gradId : 'rg-gry'})`);
+    glow.style.opacity = '';
+    if (active) glow.classList.add('gp');
+    else        glow.classList.remove('gp');
+
+    const circle = sr.querySelector(`#${id}-c`);
+    if (active) {
+      circle.style.fill        = color;
+      circle.style.stroke      = 'rgba(255,255,255,0.35)';
+      circle.style.fillOpacity = '1';
+    } else {
+      circle.style.fill        = grayColor;
+      circle.style.stroke      = 'rgba(255,255,255,0.20)';
+      circle.style.fillOpacity = '1';
+    }
+
+    if (valText !== null) {
+      const val = sr.querySelector(`#${id}-val`);
+      if (val) val.textContent = valText;
+    }
+  }
+
+  _setFlow(sr, ids, visible, dur) {
+    const d    = dur.toFixed(2);
+    const half = parseFloat((dur / 2).toFixed(2));
+    const gOff = [dur * 0.025, dur * 0.05, dur * 0.075];
+    ids.forEach((sel, i) => {
+      const base = i === 1 ? -half : 0;
+      const el = sr.querySelector(sel);
+      if (el) {
+        el.style.visibility        = visible ? 'visible' : 'hidden';
+        el.style.animationDuration = `${d}s`;
+        el.style.animationDelay    = `${base.toFixed(2)}s`;
+      }
+      gOff.forEach((off, gi) => {
+        const g = sr.querySelector(`${sel}g${gi + 1}`);
+        if (g) {
+          g.style.visibility        = visible ? 'visible' : 'hidden';
+          g.style.animationDuration = `${d}s`;
+          g.style.animationDelay    = `${(base + off).toFixed(2)}s`;
+        }
+      });
+    });
+  }
+
+  _setParticles(sr, prefix, color, visible, dur, path) {
+    // phases evenly distributed: 0.15, 0.65, 0.35, 0.85, 0.55, 0.05, 0.75, 0.25
+    const configs = [
+      { n: 1, vis: visible,              del: dur *  0.15 },
+      { n: 2, vis: visible,              del: dur * -0.35 },
+      { n: 3, vis: visible && dur < 2.8, del: dur *  0.35 },
+      { n: 4, vis: visible && dur < 2.8, del: dur * -0.15 },
+      { n: 5, vis: visible && dur < 2.0, del: dur *  0.55 },
+      { n: 6, vis: visible && dur < 2.0, del: dur *  0.05 },
+      { n: 7, vis: visible && dur < 1.3, del: dur *  0.75 },
+      { n: 8, vis: visible && dur < 1.3, del: dur *  0.25 },
+    ];
+    configs.forEach(({ n, vis, del }) => {
+      const el = sr.querySelector(`#dp-${prefix}-${n}`);
+      if (!el) return;
+      el.style.visibility        = vis ? 'visible' : 'hidden';
+      el.style.animationDuration = `${dur.toFixed(2)}s`;
+      el.style.animationDelay    = `${del.toFixed(2)}s`;
+      el.setAttribute('fill', color);
+      if (path !== undefined) el.style.offsetPath = `path('${path}')`;
+    });
+  }
+
+  _tickSun() {
+    if (!this._hass) return;
+    const sr = this.shadowRoot;
+    if (!sr.querySelector('#arc-prog')) return;
+
+    const isDay  = this._isDay();
+    const sunT   = isDay ? this._getSunT() : -1;
+    const pv     = this._val(this._config.pv_entity);
+    const isProd = pv > 20;
+    const L      = SolarArcCard.L;
+    const f      = n => this._f(n);
+
+    sr.querySelector('#sun-g').style.display  = isDay ? 'block' : 'none';
+    sr.querySelector('#moon-g').style.display = isDay ? 'none' : 'block';
+
+    if (!isDay) {
+      const nightT   = this._getNightT();
+      const moonArcT = nightT >= 0 ? nightT : 0;
+      const mp = this._qp(moonArcT, L.A0, L.A1, L.A2);
+      sr.querySelector('#moon-body').setAttribute('transform', `translate(${f(mp[0])},${f(mp[1])})`);
+      return;
+    }
+
+    const sp = this._qp(sunT, L.A0, L.A1, L.A2);
+    const sx = f(sp[0]), sy = f(sp[1]);
+
+    sr.querySelector('#sun-body').setAttribute('transform', `translate(${sx},${sy})`);
+    const pillX = sp[0] + 94 > 390 ? sp[0] - 94 : sp[0] + 14;
+    sr.querySelector('#sun-pill').setAttribute('transform', `translate(${f(pillX)},${f(sp[1]-16)})`);
+
+    const prog = this._arcLen(sunT, L.A0, L.A1, L.A2);
+    sr.querySelector('#arc-prog').setAttribute('stroke-dasharray', `${f(prog)} 9999`);
+    sr.querySelector('#arc-prog').setAttribute('opacity', isDay ? '0.9' : '0');
+
+    const ex        = f(L.INV[0]), ey = f(L.INV[1] - RR);
+    const midY      = f((sp[1] + L.INV[1] - RR) / 2);
+    const solarPath = `M${sx},${sy} C${sx},${midY} ${ex},${midY} ${ex},${ey}`;
+    sr.querySelector('#p-solar').setAttribute('d', solarPath);
+    ['#d-sol-1','#d-sol-2','#d-sol-1g1','#d-sol-2g1','#d-sol-1g2','#d-sol-2g2','#d-sol-1g3','#d-sol-2g3']
+      .forEach(id => { const e = sr.querySelector(id); if (e) e.style.offsetPath = `path('${solarPath}')`; });
+    for (let n = 1; n <= 8; n++) {
+      const e = sr.querySelector(`#dp-sol-${n}`);
+      if (e) e.style.offsetPath = `path('${solarPath}')`;
+    }
+  }
+}
+
+customElements.define('solar-arc-card', SolarArcCard);
+
+window.customCards = window.customCards || [];
+window.customCards.push({
+  type: 'solar-arc-card',
+  name: 'Solar Arc Card',
+  description: 'Solar arc with energy flow — FVE, Grid, House',
+});
