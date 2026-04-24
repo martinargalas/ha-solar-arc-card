@@ -1,4 +1,4 @@
-// solar-arc-card.js v4r134
+// solar-arc-card.js v4r136
 
 const MDI = {
   generator:   'M6 3C4.89 3 4 3.9 4 5V16H6V17C6 17.55 6.45 18 7 18H8C8.55 18 9 17.55 9 17V16H15V17C15 17.55 15.45 18 16 18H17C17.55 18 18 17.55 18 17V16H20V5C20 3.9 19.11 3 18 3H6M12 7V5H18V7H12M12 9H18V11H12V9M8 5V9H10L7 15V11H5L8 5M22 20V22H2V20H22Z',
@@ -6,6 +6,7 @@ const MDI = {
   home:        'M10,20V14H14V20H19V12H22L12,3L2,12H5V20H10Z',
   sunriseUp:   'M3,12H7A5,5 0 0,1 12,7A5,5 0 0,1 17,12H21A1,1 0 0,1 22,13A1,1 0 0,1 21,14H3A1,1 0 0,1 2,13A1,1 0 0,1 3,12M15,12A3,3 0 0,0 12,9A3,3 0 0,0 9,12H15M12,2L14.39,5.42C13.65,5.15 12.84,5 12,5C11.16,5 10.35,5.15 9.61,5.42L12,2M3.34,7L7.5,6.65C6.9,7.16 6.36,7.78 5.94,8.5C5.5,9.24 5.25,10 5.11,10.79L3.34,7M20.65,7L18.88,10.79C18.74,10 18.47,9.23 18.05,8.5C17.63,7.78 17.1,7.15 16.5,6.64L20.65,7M12.71,16.3L15.82,19.41C16.21,19.8 16.21,20.43 15.82,20.82C15.43,21.21 14.8,21.21 14.41,20.82L12,18.41L9.59,20.82C9.2,21.21 8.57,21.21 8.18,20.82C7.79,20.43 7.79,19.8 8.18,19.41L11.29,16.3C11.5,16.1 11.74,16 12,16C12.26,16 12.5,16.1 12.71,16.3Z',
   sunsetDown:  'M3,12H7A5,5 0 0,1 12,7A5,5 0 0,1 17,12H21A1,1 0 0,1 22,13A1,1 0 0,1 21,14H3A1,1 0 0,1 2,13A1,1 0 0,1 3,12M15,12A3,3 0 0,0 12,9A3,3 0 0,0 9,12H15M12,2L14.39,5.42C13.65,5.15 12.84,5 12,5C11.16,5 10.35,5.15 9.61,5.42L12,2M3.34,7L7.5,6.65C6.9,7.16 6.36,7.78 5.94,8.5C5.5,9.24 5.25,10 5.11,10.79L3.34,7M20.65,7L18.88,10.79C18.74,10 18.47,9.23 18.05,8.5C17.63,7.78 17.1,7.15 16.5,6.64L20.65,7M12.71,20.71L15.82,17.6C16.21,17.21 16.21,16.57 15.82,16.18C15.43,15.79 14.8,15.79 14.41,16.18L12,18.59L9.59,16.18C9.2,15.79 8.57,15.79 8.18,16.18C7.79,16.57 7.79,17.21 8.18,17.6L11.29,20.71C11.5,20.9 11.74,21 12,21C12.26,21 12.5,20.9 12.71,20.71Z',
+  batteryCharging: 'M15.67,4H14V2H10V4H8.33C7.6,4 7,4.6 7,5.33V20.67C7,21.4 7.6,22 8.33,22H15.67C16.4,22 17,21.4 17,20.67V5.33C17,4.6 16.4,4 15.67,4M11,17V13.5H9L13,7V10.5H15L11,17Z',
 };
 
 const R  = 35;
@@ -55,6 +56,12 @@ class SolarArcCard extends HTMLElement {
       arc_sun_flow_color:   arcStyle.arc_sun_flow_color   || '',
       arc_moon_flow_color:  arcStyle.arc_moon_flow_color  || '',
 
+      // ── Battery ───────────────────────────────────────────────────────────
+      battery_entity:               arc.battery_power || '',
+      battery_show:                 !!(arc.battery_power || arc.battery),
+      arc_battery_discharge_color:  arcStyle.arc_battery_discharge_color || '',
+      arc_battery_charge_color:     arcStyle.arc_battery_charge_color    || '',
+
       // ── Sankey sekce ──────────────────────────────────────────────────────
       sankey_show:            sankey.sankey_show           !== false,
       sankey_title_show:      sankey.sankey_title_show      !== false,
@@ -92,6 +99,7 @@ class SolarArcCard extends HTMLElement {
     const pv    = hass.states[this._config.pv_entity]?.state;
     const house = hass.states[this._config.house_entity]?.state;
     const grid  = hass.states[this._config.grid_entity]?.state;
+    const bat   = this._config.battery_entity ? (hass.states[this._config.battery_entity]?.state ?? '') : '';
     const sun   = hass.states[this._config.sun_entity]?.last_updated;
     const skSig = this._config.sections
       ? this._config.sections.flatMap(s =>
@@ -102,11 +110,13 @@ class SolarArcCard extends HTMLElement {
           .join(',');
 
     if (pv === this._lpv && house === this._lhse &&
-        grid === this._lgrd && sun === this._lsun && skSig === this._lsk) return;
+        grid === this._lgrd && bat === this._lbat &&
+        sun === this._lsun && skSig === this._lsk) return;
 
     this._lpv  = pv;
     this._lhse = house;
     this._lgrd = grid;
+    this._lbat = bat;
     this._lsun = sun;
     this._lsk  = skSig;
 
@@ -195,26 +205,55 @@ class SolarArcCard extends HTMLElement {
   }
   _f(n)   { return n.toFixed(1); }
 
-  // INV near arc center, GRD/HSE at bottom
+  // INV near arc center, GRD/HSE at bottom — wider spread matches battery layout
   static get L() {
     return {
       A0:  [30, 73], A1: [200, 5], A2: [370, 73],
       INV: [200, 245],
-      GRD: [70, 175],
-      HSE: [330, 175],
+      GRD: [52,  175],   // wider: was 70
+      HSE: [348, 175],   // wider: was 330
     };
   }
 
-  // Orthogonal paths: přímka → 90° oblouček (r=15) → přímka
-  // INV=[200,200] R=35 → bottom exits (195,235) / (205,235)
-  // GRD=[70,330]  R=35 → top entry   (70,295)
-  // HSE=[330,330] R=35 → top entry   (330,295)
-  // Junction level jY=295 (= GRD/HSE top)
+  // Orthogonal paths: přímka → 90° oblouček (r=13) → přímka
+  // Non-battery layout:
+  //   INV=[200,245] ring R=38 → bottom exits (195,282.7)/(205,282.7)
+  //   GRD=[52,175]  R=35 → bottom (52,210) — gutter y=313
+  //   HSE=[348,175] R=35 → bottom (348,210) — gutter y=313
   static get P() {
     return {
-      toGrid:   'M195,282.7 L195,300 Q195,313 182,313 L83,313 Q70,313 70,300 L70,210',
-      fromGrid: 'M70,210 L70,300 Q70,313 83,313 L182,313 Q195,313 195,300 L195,282.7',
-      toHouse:  'M205,282.7 L205,300 Q205,313 218,313 L317,313 Q330,313 330,300 L330,210',
+      toGrid:   'M195,282.7 L195,300 Q195,313 182,313 L65,313 Q52,313 52,300 L52,210',
+      fromGrid: 'M52,210 L52,300 Q52,313 65,313 L182,313 Q195,313 195,300 L195,282.7',
+      toHouse:  'M205,282.7 L205,300 Q205,313 218,313 L335,313 Q348,313 348,300 L348,210',
+    };
+  }
+
+  // Battery layout — node positions (wider spread, battery on left)
+  //   INV=[200,215] ring R=38 → left-center (162,215), bottom exits (195,253)/(205,253)
+  //   GRD=[52,155]  R=35 → bottom-center (52,190)
+  //   BAT=[52,295]  R=35 → bottom-center (52,330)
+  //   HSE=[348,215] R=35 → bottom-center (348,250)
+  static get LB() {
+    return {
+      A0:  [30, 73], A1: [200, 5], A2: [370, 73],
+      INV: [200, 215],
+      GRD: [52,  155],
+      BAT: [52,  295],
+      HSE: [348, 215],
+    };
+  }
+
+  // Battery layout paths (orthogonal, corner r=13)
+  //   grid:    GRD bottom → ↓ → corner right → INV left-center
+  //   battery: BAT bottom → ↓ → gutter y=348 → INV bottom-left
+  //   house:   INV bottom-right → ↓ → gutter y=348 → HSE bottom
+  static get PB() {
+    return {
+      toGrid:   'M162,215 L65,215 Q52,215 52,202 L52,190',
+      fromGrid: 'M52,190 L52,202 Q52,215 65,215 L162,215',
+      toHouse:  'M205,253 L205,335 Q205,348 218,348 L335,348 Q348,348 348,335 L348,250',
+      fromBat:  'M52,330 L52,335 Q52,348 65,348 L182,348 Q195,348 195,335 L195,253',
+      toBat:    'M195,253 L195,335 Q195,348 182,348 L65,348 Q52,348 52,335 L52,330',
     };
   }
 
@@ -261,8 +300,15 @@ class SolarArcCard extends HTMLElement {
   }
 
   _buildDOM() {
-    const { INV, GRD, HSE } = SolarArcCard.L;
-    const { toGrid, fromGrid, toHouse } = SolarArcCard.P;
+    const hasBat  = this._config.battery_show;
+    const L       = hasBat ? SolarArcCard.LB : SolarArcCard.L;
+    const Paths   = hasBat ? SolarArcCard.PB : SolarArcCard.P;
+    const { INV, GRD, HSE } = L;
+    const BAT     = hasBat ? L.BAT : null;
+    const { toGrid, fromGrid, toHouse } = Paths;
+    const fromBat = hasBat ? Paths.fromBat : '';
+    const toBat   = hasBat ? Paths.toBat   : '';
+    const viewBox = hasBat ? '0 0 400 385' : '0 0 400 335';
     this._arcGrads = {};   // reset custom gradient cache
 
     this.shadowRoot.innerHTML = `
@@ -335,7 +381,7 @@ class SolarArcCard extends HTMLElement {
   .og2 { --oval-max-op: 0.25; }
   .og3 { --oval-max-op: 0.10; }
 
-  #inv-ring-solar, #inv-ring-grid {
+  #inv-ring-solar, #inv-ring-grid, #inv-ring-bat {
     transition: stroke-dasharray 1s ease, stroke-dashoffset 1s ease,
                 stroke 0.5s ease, opacity 0.4s ease;
   }
@@ -357,7 +403,7 @@ class SolarArcCard extends HTMLElement {
 
   ${this._sepHTML(this._config.arc_title_show, this._config.arc_title_icon_show, this._config.arc_title_icon, this._config.arc_title_icon_color, this._config.arc_title_text, this._config.arc_title_text_color)}
 
-<svg viewBox="0 0 400 335" xmlns="http://www.w3.org/2000/svg" style="display:${this._config.arc_show ? 'block' : 'none'}">
+<svg viewBox="${viewBox}" xmlns="http://www.w3.org/2000/svg" style="display:${this._config.arc_show ? 'block' : 'none'}">
   <defs>
     <linearGradient id="ag" x1="30" y1="0" x2="370" y2="0" gradientUnits="userSpaceOnUse">
       <stop offset="0"    stop-color="#ffffff" stop-opacity="0"/>
@@ -545,15 +591,20 @@ class SolarArcCard extends HTMLElement {
   </g>
 
   <!-- DIM FLOW PATHS -->
-  <path id="p-solar"     d=""          fill="none" stroke="transparent"              stroke-width="5"/>
-  <path id="p-to-grid"   d="${toGrid}"   fill="none" stroke="rgba(255,255,255,0.10)" stroke-width="5"/>
-  <path id="p-from-grid" d="${fromGrid}" fill="none" stroke="transparent"              stroke-width="5"/>
-  <path id="p-to-house"  d="${toHouse}"  fill="none" stroke="rgba(255,255,255,0.10)" stroke-width="5"/>
+  <path id="p-solar"     d=""           fill="none" stroke="transparent"             stroke-width="5"/>
+  <path id="p-to-grid"   d="${toGrid}"  fill="none" stroke="rgba(255,255,255,0.10)" stroke-width="5"/>
+  <path id="p-from-grid" d="${fromGrid}" fill="none" stroke="transparent"            stroke-width="5"/>
+  <path id="p-to-house"  d="${toHouse}" fill="none" stroke="rgba(255,255,255,0.10)" stroke-width="5"/>
+  ${hasBat ? `
+  <path id="p-from-bat"  d="${fromBat}" fill="none" stroke="rgba(255,255,255,0.10)" stroke-width="5"/>
+  <path id="p-to-bat"    d="${toBat}"   fill="none" stroke="transparent"            stroke-width="5"/>
+  ` : ''}
 
-  <!-- NODES: INV top-center, GRD bottom-left, HSE bottom-right -->
-  ${this._nodeSVG('inv', INV[0], INV[1], MDI.generator, false)}
-  ${this._nodeSVG('grd', GRD[0], GRD[1], MDI.tower,     true)}
-  ${this._nodeSVG('hse', HSE[0], HSE[1], MDI.home,       true)}
+  <!-- NODES -->
+  ${this._nodeSVG('inv', INV[0], INV[1], MDI.generator,        false)}
+  ${this._nodeSVG('grd', GRD[0], GRD[1], MDI.tower,            true)}
+  ${this._nodeSVG('hse', HSE[0], HSE[1], MDI.home,             true)}
+  ${hasBat ? this._nodeSVG('bat', BAT[0], BAT[1], MDI.batteryCharging, true) : ''}
 
   <!-- INV RING: navrch nodů, aby glow/fill node nepřekrýval ringy -->
   <circle id="inv-ring-bg" cx="${INV[0]}" cy="${INV[1]}" r="38"
@@ -563,6 +614,13 @@ class SolarArcCard extends HTMLElement {
     stroke-dasharray="0 238.8" stroke-dashoffset="0"
     transform="rotate(-90, ${INV[0]}, ${INV[1]})"
     filter="url(#ring-glow)" opacity="0"/>
+  ${hasBat ? `
+  <circle id="inv-ring-bat" cx="${INV[0]}" cy="${INV[1]}" r="38"
+    fill="none" stroke="#30D158" stroke-width="7" stroke-linecap="round"
+    stroke-dasharray="0 238.8" stroke-dashoffset="0"
+    transform="rotate(-90, ${INV[0]}, ${INV[1]})"
+    filter="url(#ring-glow)" opacity="0"/>
+  ` : ''}
   <circle id="inv-ring-grid" cx="${INV[0]}" cy="${INV[1]}" r="38"
     fill="none" stroke="#0084FF" stroke-width="7" stroke-linecap="round"
     stroke-dasharray="0 238.8" stroke-dashoffset="0"
@@ -578,6 +636,12 @@ class SolarArcCard extends HTMLElement {
   <ellipse id="d-imp-2g3" class="oval og3" rx="4" ry="1.5" fill="#0a84ff" style="offset-path:path('${fromGrid}');animation-duration:3.5s;animation-delay:-1.51s"/>
   <ellipse id="d-hse-1g3" class="oval og3" rx="4" ry="1.5" fill="#FF9500" style="offset-path:path('${toHouse}');animation-duration:3.5s;animation-delay:0.24s"/>
   <ellipse id="d-hse-2g3" class="oval og3" rx="4" ry="1.5" fill="#FF9500" style="offset-path:path('${toHouse}');animation-duration:3.5s;animation-delay:-1.51s"/>
+  ${hasBat ? `
+  <ellipse id="d-bat-1g3" class="oval og3" rx="4" ry="1.5" fill="#30D158" style="offset-path:path('${fromBat}');animation-duration:3.5s;animation-delay:0.24s"/>
+  <ellipse id="d-bat-2g3" class="oval og3" rx="4" ry="1.5" fill="#30D158" style="offset-path:path('${fromBat}');animation-duration:3.5s;animation-delay:-1.51s"/>
+  <ellipse id="d-chg-1g3" class="oval og3" rx="4" ry="1.5" fill="#30D158" style="offset-path:path('${toBat}');animation-duration:3.5s;animation-delay:0.24s"/>
+  <ellipse id="d-chg-2g3" class="oval og3" rx="4" ry="1.5" fill="#30D158" style="offset-path:path('${toBat}');animation-duration:3.5s;animation-delay:-1.51s"/>
+  ` : ''}
 
   <!-- GHOSTY g2 -->
   <ellipse id="d-sol-1g2" class="oval og2" rx="5.5" ry="2" fill="#ffd60a" style="offset-path:path('');animation-duration:3.5s;animation-delay:0.16s"/>
@@ -588,6 +652,12 @@ class SolarArcCard extends HTMLElement {
   <ellipse id="d-imp-2g2" class="oval og2" rx="5.5" ry="2" fill="#0084FF" style="offset-path:path('${fromGrid}');animation-duration:3.5s;animation-delay:-1.59s"/>
   <ellipse id="d-hse-1g2" class="oval og2" rx="5.5" ry="2" fill="#ff9500" style="offset-path:path('${toHouse}');animation-duration:3.5s;animation-delay:0.16s"/>
   <ellipse id="d-hse-2g2" class="oval og2" rx="5.5" ry="2" fill="#ff9500" style="offset-path:path('${toHouse}');animation-duration:3.5s;animation-delay:-1.59s"/>
+  ${hasBat ? `
+  <ellipse id="d-bat-1g2" class="oval og2" rx="5.5" ry="2" fill="#30D158" style="offset-path:path('${fromBat}');animation-duration:3.5s;animation-delay:0.16s"/>
+  <ellipse id="d-bat-2g2" class="oval og2" rx="5.5" ry="2" fill="#30D158" style="offset-path:path('${fromBat}');animation-duration:3.5s;animation-delay:-1.59s"/>
+  <ellipse id="d-chg-1g2" class="oval og2" rx="5.5" ry="2" fill="#30D158" style="offset-path:path('${toBat}');animation-duration:3.5s;animation-delay:0.16s"/>
+  <ellipse id="d-chg-2g2" class="oval og2" rx="5.5" ry="2" fill="#30D158" style="offset-path:path('${toBat}');animation-duration:3.5s;animation-delay:-1.59s"/>
+  ` : ''}
 
   <!-- GHOSTY g1 (nejblíž hlavě) -->
   <ellipse id="d-sol-1g1" class="oval og1" rx="6.5" ry="2.2" fill="#ffd60a" style="offset-path:path('');animation-duration:3.5s;animation-delay:0.08s"/>
@@ -598,6 +668,12 @@ class SolarArcCard extends HTMLElement {
   <ellipse id="d-imp-2g1" class="oval og1" rx="6.5" ry="2.2" fill="#0084FF" style="offset-path:path('${fromGrid}');animation-duration:3.5s;animation-delay:-1.67s"/>
   <ellipse id="d-hse-1g1" class="oval og1" rx="6.5" ry="2.2" fill="#ff9500" style="offset-path:path('${toHouse}');animation-duration:3.5s;animation-delay:0.08s"/>
   <ellipse id="d-hse-2g1" class="oval og1" rx="6.5" ry="2.2" fill="#ff9500" style="offset-path:path('${toHouse}');animation-duration:3.5s;animation-delay:-1.67s"/>
+  ${hasBat ? `
+  <ellipse id="d-bat-1g1" class="oval og1" rx="6.5" ry="2.2" fill="#30D158" style="offset-path:path('${fromBat}');animation-duration:3.5s;animation-delay:0.08s"/>
+  <ellipse id="d-bat-2g1" class="oval og1" rx="6.5" ry="2.2" fill="#30D158" style="offset-path:path('${fromBat}');animation-duration:3.5s;animation-delay:-1.67s"/>
+  <ellipse id="d-chg-1g1" class="oval og1" rx="6.5" ry="2.2" fill="#30D158" style="offset-path:path('${toBat}');animation-duration:3.5s;animation-delay:0.08s"/>
+  <ellipse id="d-chg-2g1" class="oval og1" rx="6.5" ry="2.2" fill="#30D158" style="offset-path:path('${toBat}');animation-duration:3.5s;animation-delay:-1.67s"/>
+  ` : ''}
 
   <!-- HLAVY -->
   <ellipse id="d-sol-1" class="oval" rx="7" ry="2.5" fill="#ffd60a" filter="url(#gd)" style="offset-path:path('');animation-duration:3.5s"/>
@@ -608,6 +684,12 @@ class SolarArcCard extends HTMLElement {
   <ellipse id="d-imp-2" class="oval" rx="7" ry="2.5" fill="#0084FF" filter="url(#gd)" style="offset-path:path('${fromGrid}');animation-duration:3.5s;animation-delay:-1.75s"/>
   <ellipse id="d-hse-1" class="oval" rx="7" ry="2.5" fill="#ff9500" filter="url(#gd)" style="offset-path:path('${toHouse}');animation-duration:3.5s"/>
   <ellipse id="d-hse-2" class="oval" rx="7" ry="2.5" fill="#ff9500" filter="url(#gd)" style="offset-path:path('${toHouse}');animation-duration:3.5s;animation-delay:-1.75s"/>
+  ${hasBat ? `
+  <ellipse id="d-bat-1" class="oval" rx="7" ry="2.5" fill="#30D158" filter="url(#gd)" style="offset-path:path('${fromBat}');animation-duration:3.5s"/>
+  <ellipse id="d-bat-2" class="oval" rx="7" ry="2.5" fill="#30D158" filter="url(#gd)" style="offset-path:path('${fromBat}');animation-duration:3.5s;animation-delay:-1.75s"/>
+  <ellipse id="d-chg-1" class="oval" rx="7" ry="2.5" fill="#30D158" filter="url(#gd)" style="offset-path:path('${toBat}');animation-duration:3.5s"/>
+  <ellipse id="d-chg-2" class="oval" rx="7" ry="2.5" fill="#30D158" filter="url(#gd)" style="offset-path:path('${toBat}');animation-duration:3.5s;animation-delay:-1.75s"/>
+  ` : ''}
 
   <!-- PARTICLES — translateY shifts perpendicular to path (offset-rotate:auto local space) -->
   <!-- sol: 8 particles, ±5px / ±8px lateral offset -->
@@ -646,6 +728,26 @@ class SolarArcCard extends HTMLElement {
   <ellipse id="dp-hse-6" class="oval prt" rx="1.5" ry="1.5" fill="#ff9500" style="offset-path:path('${toHouse}');animation-duration:3.5s;animation-delay:0.18s;transform:translateY(-5px)"/>
   <ellipse id="dp-hse-7" class="oval prt" rx="2.5" ry="0.8" fill="#ff9500" style="offset-path:path('${toHouse}');animation-duration:3.5s;animation-delay:2.63s;transform:translateY(8px)"/>
   <ellipse id="dp-hse-8" class="oval prt" rx="2.5" ry="0.8" fill="#ff9500" style="offset-path:path('${toHouse}');animation-duration:3.5s;animation-delay:0.88s;transform:translateY(-8px)"/>
+  ${hasBat ? `
+  <!-- bat discharge -->
+  <ellipse id="dp-bat-1" class="oval prt" rx="1.5" ry="1.5" fill="#30D158" style="offset-path:path('${fromBat}');animation-duration:3.5s;animation-delay:0.53s;transform:translateY(5px)"/>
+  <ellipse id="dp-bat-2" class="oval prt" rx="1.5" ry="1.5" fill="#30D158" style="offset-path:path('${fromBat}');animation-duration:3.5s;animation-delay:-1.23s;transform:translateY(-5px)"/>
+  <ellipse id="dp-bat-3" class="oval prt" rx="2.5" ry="0.8" fill="#30D158" style="offset-path:path('${fromBat}');animation-duration:3.5s;animation-delay:1.23s;transform:translateY(8px)"/>
+  <ellipse id="dp-bat-4" class="oval prt" rx="2.5" ry="0.8" fill="#30D158" style="offset-path:path('${fromBat}');animation-duration:3.5s;animation-delay:-0.53s;transform:translateY(-8px)"/>
+  <ellipse id="dp-bat-5" class="oval prt" rx="1.5" ry="1.5" fill="#30D158" style="offset-path:path('${fromBat}');animation-duration:3.5s;animation-delay:1.93s;transform:translateY(5px)"/>
+  <ellipse id="dp-bat-6" class="oval prt" rx="1.5" ry="1.5" fill="#30D158" style="offset-path:path('${fromBat}');animation-duration:3.5s;animation-delay:0.18s;transform:translateY(-5px)"/>
+  <ellipse id="dp-bat-7" class="oval prt" rx="2.5" ry="0.8" fill="#30D158" style="offset-path:path('${fromBat}');animation-duration:3.5s;animation-delay:2.63s;transform:translateY(8px)"/>
+  <ellipse id="dp-bat-8" class="oval prt" rx="2.5" ry="0.8" fill="#30D158" style="offset-path:path('${fromBat}');animation-duration:3.5s;animation-delay:0.88s;transform:translateY(-8px)"/>
+  <!-- bat charge -->
+  <ellipse id="dp-chg-1" class="oval prt" rx="1.5" ry="1.5" fill="#30D158" style="offset-path:path('${toBat}');animation-duration:3.5s;animation-delay:0.53s;transform:translateY(5px)"/>
+  <ellipse id="dp-chg-2" class="oval prt" rx="1.5" ry="1.5" fill="#30D158" style="offset-path:path('${toBat}');animation-duration:3.5s;animation-delay:-1.23s;transform:translateY(-5px)"/>
+  <ellipse id="dp-chg-3" class="oval prt" rx="2.5" ry="0.8" fill="#30D158" style="offset-path:path('${toBat}');animation-duration:3.5s;animation-delay:1.23s;transform:translateY(8px)"/>
+  <ellipse id="dp-chg-4" class="oval prt" rx="2.5" ry="0.8" fill="#30D158" style="offset-path:path('${toBat}');animation-duration:3.5s;animation-delay:-0.53s;transform:translateY(-8px)"/>
+  <ellipse id="dp-chg-5" class="oval prt" rx="1.5" ry="1.5" fill="#30D158" style="offset-path:path('${toBat}');animation-duration:3.5s;animation-delay:1.93s;transform:translateY(5px)"/>
+  <ellipse id="dp-chg-6" class="oval prt" rx="1.5" ry="1.5" fill="#30D158" style="offset-path:path('${toBat}');animation-duration:3.5s;animation-delay:0.18s;transform:translateY(-5px)"/>
+  <ellipse id="dp-chg-7" class="oval prt" rx="2.5" ry="0.8" fill="#30D158" style="offset-path:path('${toBat}');animation-duration:3.5s;animation-delay:2.63s;transform:translateY(8px)"/>
+  <ellipse id="dp-chg-8" class="oval prt" rx="2.5" ry="0.8" fill="#30D158" style="offset-path:path('${toBat}');animation-duration:3.5s;animation-delay:0.88s;transform:translateY(-8px)"/>
+  ` : ''}
 
   <!-- SUN PILL — navrch všeho (z-order) -->
   <g id="sun-pill" opacity="0">
@@ -697,6 +799,10 @@ class SolarArcCard extends HTMLElement {
     const pv    = this._val(this._config.pv_entity);
     const house = this._val(this._config.house_entity);
     const grid  = this._val(this._config.grid_entity);
+    const hasBat       = this._config.battery_show;
+    const bat          = hasBat ? this._val(this._config.battery_entity) : 0;
+    const isDischarging = hasBat && bat > 10;
+    const isCharging    = hasBat && bat < -10;
     const tz    = this._hass.config?.time_zone;
     const sunAttrs = this._hass.states[this._config.sun_entity]?.attributes || {};
     const isDay  = this._isDay();
@@ -710,7 +816,7 @@ class SolarArcCard extends HTMLElement {
     const solStroke = 'rgba(255,255,255,0.12)';
     const solIds = ['#d-sol-1','#d-sol-2','#d-sol-1g1','#d-sol-2g1','#d-sol-1g2','#d-sol-2g2','#d-sol-1g3','#d-sol-2g3'];
 
-    const L = SolarArcCard.L;
+    const L = hasBat ? SolarArcCard.LB : SolarArcCard.L;
     const f = n => this._f(n);
 
     sr.querySelector('#sun-g').style.display  = isDay ? 'block' : 'none';
@@ -829,26 +935,39 @@ class SolarArcCard extends HTMLElement {
     invGlow.classList.remove('gp');
     invGlow.style.opacity = '0';
 
-    // ── INV RING: kruhový graf solár vs grid-import ──────────────────
-    const RC       = 238.76; // 2π × 38
-    const pvPow    = Math.max(0, pv);
-    const impPow   = Math.max(0, -grid);
-    const totSrc   = pvPow + impPow;
-    const sFrac    = totSrc > 20 ? pvPow / totSrc : (isProd ? 1 : 0);
-    const gFrac    = 1 - sFrac;
-    const hasTwo   = sFrac > 0.02 && gFrac > 0.02;
-    const gap      = hasTwo ? 4 : 0;
-    const sLen     = Math.max(0, RC * sFrac - gap).toFixed(1);
-    const gLen     = Math.max(0, RC * gFrac - gap).toFixed(1);
-    const gOff     = (-(RC * sFrac)).toFixed(1);
+    // ── INV RING: kruhový graf solár / baterie / grid-import ─────────
+    const RC      = 238.76; // 2π × 38
+    const pvPow   = Math.max(0, pv);
+    const impPow  = Math.max(0, -grid);
+    const batPow  = isDischarging ? bat : 0;               // pouze vybíjení přispívá do ringy
+    const totSrc  = pvPow + impPow + batPow;
+    const sFrac   = totSrc > 20 ? pvPow  / totSrc : (isProd ? 1 : 0);
+    const bFrac   = totSrc > 20 ? batPow / totSrc : 0;
+    const gFrac   = totSrc > 20 ? impPow / totSrc : (1 - sFrac - bFrac);   // backward compat
+    const nAct    = (sFrac > 0.02 ? 1 : 0) + (bFrac > 0.02 ? 1 : 0) + (gFrac > 0.02 ? 1 : 0);
+    const gap     = nAct > 1 ? 4 : 0;
+    const sLen    = Math.max(0, RC * sFrac - (sFrac > 0.02 ? gap : 0)).toFixed(1);
+    const bLen    = Math.max(0, RC * bFrac - (bFrac > 0.02 ? gap : 0)).toFixed(1);
+    const gLen    = Math.max(0, RC * gFrac - (gFrac > 0.02 ? gap : 0)).toFixed(1);
+    const bOff    = (-(RC * sFrac)).toFixed(1);
+    const gOff    = (-(RC * (sFrac + bFrac))).toFixed(1);
 
     const ringSolar = sr.querySelector('#inv-ring-solar');
+    const ringBat   = sr.querySelector('#inv-ring-bat');   // null v non-battery layoutu
     const ringGrid  = sr.querySelector('#inv-ring-grid');
 
     ringSolar.setAttribute('stroke', solColor);
     ringSolar.setAttribute('stroke-dasharray', `${sLen} ${RC.toFixed(1)}`);
     ringSolar.setAttribute('stroke-dashoffset', '0');
     ringSolar.style.opacity = sFrac > 0.02 ? '0.92' : '0';
+
+    if (ringBat) {
+      const bColor = cfg.arc_battery_discharge_color || '#30D158';
+      ringBat.setAttribute('stroke', bColor);
+      ringBat.setAttribute('stroke-dasharray', `${bLen} ${RC.toFixed(1)}`);
+      ringBat.setAttribute('stroke-dashoffset', bOff);
+      ringBat.style.opacity = bFrac > 0.02 ? '0.90' : '0';
+    }
 
     ringGrid.setAttribute('stroke', cfg.arc_grid_color || (isImport ? '#0084FF' : '#32D74B'));
     ringGrid.setAttribute('stroke-dasharray', `${gLen} ${RC.toFixed(1)}`);
@@ -866,6 +985,40 @@ class SolarArcCard extends HTMLElement {
     const hseGradId = cfg.arc_home_color ? this._ensureArcGrad(sr, cfg.arc_home_color) : 'rg-org';
     this._nodeUpdate(sr, 'grd', isImport || isExport, gFill, gGradId, gLabel, inactiveColor);
     this._nodeUpdate(sr, 'hse', house > 20, hseFill, hseGradId, this._fmt(house), inactiveColor);
+
+    // ── Battery node + flow ──────────────────────────────────────────────────
+    if (hasBat) {
+      const batDisColor = cfg.arc_battery_discharge_color || '#30D158';
+      const batChgColor = cfg.arc_battery_charge_color    || '#30D158';
+      const batActive   = isDischarging || isCharging;
+      const batFill     = isDischarging ? batDisColor
+                        : isCharging    ? batChgColor
+                        : null;
+      const batGradId   = isDischarging
+        ? (cfg.arc_battery_discharge_color ? this._ensureArcGrad(sr, batDisColor) : 'rg-grn')
+        : isCharging
+          ? (cfg.arc_battery_charge_color   ? this._ensureArcGrad(sr, batChgColor) : 'rg-grn')
+          : 'rg-grn';
+      const batLabel = isDischarging ? `↑ ${this._fmt(bat)}`
+                     : isCharging    ? `↓ ${this._fmt(Math.abs(bat))}`
+                     : this._fmt(Math.abs(bat));
+      this._nodeUpdate(sr, 'bat', batActive,
+        batFill || 'rgba(48,209,88,0.90)', batGradId, batLabel, inactiveColor);
+
+      // Oval flow
+      if (cfg.arc_battery_discharge_color) this._setOvalColor(sr, 'bat', batDisColor);
+      if (cfg.arc_battery_charge_color)    this._setOvalColor(sr, 'chg', batChgColor);
+      this._setFlow(sr, ['#d-bat-1','#d-bat-2'], isDischarging, this._dur(bat));
+      this._setFlow(sr, ['#d-chg-1','#d-chg-2'], isCharging,    this._dur(Math.abs(bat)));
+      this._setParticles(sr, 'bat', batDisColor, isDischarging, this._dur(bat));
+      this._setParticles(sr, 'chg', batChgColor, isCharging,    this._dur(Math.abs(bat)));
+
+      // Dim paths
+      const pFromBat = sr.querySelector('#p-from-bat');
+      const pToBat   = sr.querySelector('#p-to-bat');
+      if (pFromBat) pFromBat.style.stroke = isDischarging ? 'rgba(255,255,255,0.12)' : 'transparent';
+      if (pToBat)   pToBat.style.stroke   = isCharging    ? 'rgba(255,255,255,0.12)' : 'transparent';
+    }
 
     // ── Barvy textu a ikon ────────────────────────────────────────────────────
     if (cfg.arc_text_color) {
@@ -960,18 +1113,33 @@ class SolarArcCard extends HTMLElement {
       ? Math.max(houseIn, l1Tot + l2Pow + l3Pow + invPow)
       : houseIn;
 
+    // ── Battery ─────────────────────────────────────────────────────────────
+    // positive = discharging (source), negative = charging (consumer)
+    const batRaw    = cfg.battery_show ? this._val(cfg.battery_entity) : 0;
+    const batDis    = Math.max(0,  batRaw);   // discharge power
+    const batChg    = Math.max(0, -batRaw);   // charge power
+    const hasBatDis = batDis > 10;
+    const hasBatChg = batChg > 10;
+    const batDisCol = cfg.arc_battery_discharge_color || '#30D158';
+    const batChgCol = cfg.arc_battery_charge_color    || '#30D158';
+    // When charging, sources need to list battery as a child so flows are drawn
+    const pvCh  = hasBatChg ? ['_hse_', '_exp_', '_bat_'] : ['_hse_', '_exp_'];
+    const grdCh = hasBatChg ? ['_hse_', '_bat_']          : ['_hse_'];
+
     const e = (id, name, col, val, children) =>
       ({ entity_id: id, name, color: col, _v: val, ...(children ? { children } : {}) });
 
     if (useDetail) {
       const sects = [
         { entities: [
-          e('_pv_',  'Solár',  '#FFD60A', pvPow,   ['_hse_', '_exp_']),
-          e('_grd_', 'Síť',    '#007AFF', impPow,  ['_hse_']),
+          e('_pv_',  'Solár',  '#FFD60A', pvPow,   hasBatChg ? ['_hse_', '_exp_', '_bat_'] : ['_hse_', '_exp_']),
+          e('_grd_', 'Síť',    '#007AFF', impPow,  hasBatChg ? ['_hse_', '_bat_'] : ['_hse_']),
+          ...(hasBatDis ? [e('_bat_', 'Battery', batDisCol, batDis, ['_hse_'])] : []),
         ]},
         { entities: [
           e('_hse_', 'Dům',    '#FF9500', houseTot, ['_l1_','_l2_','_l3_','_inv_']),
           e('_exp_', 'Přetok', '#30D158', expPow),
+          ...(hasBatChg ? [e('_bat_', 'Battery', batChgCol, batChg)] : []),
         ]},
         { entities: [
           e('_l1_',  'L1',      '#5AC8FA', l1Tot,  pcPow+tvPow>0 ? ['_pc_','_tv_'] : undefined),
@@ -988,12 +1156,14 @@ class SolarArcCard extends HTMLElement {
     }
     return [
       { entities: [
-        e('_pv_',  'Solár',  '#FFD60A', pvPow,   ['_hse_', '_exp_']),
-        e('_grd_', 'Síť',    '#007AFF', impPow,  ['_hse_']),
+        e('_pv_',  'Solár',  '#FFD60A', pvPow,  pvCh),
+        e('_grd_', 'Síť',    '#007AFF', impPow, grdCh),
+        ...(hasBatDis ? [e('_bat_', 'Battery', batDisCol, batDis, ['_hse_'])] : []),
       ]},
       { entities: [
         e('_hse_', 'Dům',    '#FF9500', houseTot),
         e('_exp_', 'Přetok', '#30D158', expPow),
+        ...(hasBatChg ? [e('_bat_', 'Battery', batChgCol, batChg)] : []),
       ]},
     ];
   }
@@ -1564,7 +1734,7 @@ class SolarArcCard extends HTMLElement {
     const sunT   = isDay ? this._getSunT() : -1;
     const pv     = this._val(this._config.pv_entity);
     const isProd = pv > 20;
-    const L      = SolarArcCard.L;
+    const L      = this._config?.battery_show ? SolarArcCard.LB : SolarArcCard.L;
     const f      = n => this._f(n);
 
     sr.querySelector('#sun-g').style.display  = isDay ? 'block' : 'none';

@@ -16,8 +16,9 @@ Custom Lovelace card for Home Assistant that combines two visualizations in one:
 ## Features
 
 - Sun/moon arc with real-time position based on the built-in `sun.sun` entity
-- Animated energy flow particles (solar → inverter → grid / house)
-- Inverter ring chart showing solar vs. grid-import ratio
+- Animated energy flow particles (solar → inverter → grid / house / battery)
+- Inverter ring chart showing solar vs. grid-import vs. battery-discharge ratio
+- **Battery node** — optional fourth node with charge/discharge flow and ring segment
 - Day/night mode with clouds, stars, moon and pill label
 - Glassmorphism card design
 - Fully configurable Sankey diagram with unlimited sections and entities
@@ -64,6 +65,18 @@ arc:
   grid_power: sensor.grid_active_power
 ```
 
+### With battery
+
+```yaml
+type: custom:solar-arc-card
+
+arc:
+  solar_production: sensor.pv_production_power
+  house_consumption: sensor.home_consumption_power
+  grid_power: sensor.grid_active_power
+  battery_power: sensor.battery_power
+```
+
 ### Full example
 
 ```yaml
@@ -73,6 +86,7 @@ arc:
   solar_production: sensor.pv_production_power
   house_consumption: sensor.home_consumption_power
   grid_power: sensor.grid_active_power
+  battery_power: sensor.battery_power
 
   arc_show: true
   arc_title_show: true
@@ -91,6 +105,8 @@ arc:
     arc_inactive_color: ""
     arc_sun_flow_color: ""
     arc_moon_flow_color: ""
+    arc_battery_discharge_color: "#30D158"
+    arc_battery_charge_color: "#30D158"
 
 sankey:
   sankey_show: true
@@ -119,28 +135,18 @@ sankey:
           children:
             - sensor.home_consumption_power
             - sensor.grid_export_power
+        - entity_id: sensor.battery_power
+          name: Battery
+          color: "#30D158"
+          children:
+            - sensor.home_consumption_power
     - entities:
         - entity_id: sensor.home_consumption_power
           name: Home
           color: "#FF9500"
-          children:
-            - sensor.floor1_consumption_power
-            - sensor.floor2_consumption_power
-            - sensor.floor3_consumption_power
         - entity_id: sensor.grid_export_power
-          type: remaining_parent_state
           name: Grid export
           color: "#30D158"
-    - entities:
-        - entity_id: sensor.floor1_consumption_power
-          name: Floor 1
-          color: "#5AC8FA"
-        - entity_id: sensor.floor2_consumption_power
-          name: Floor 2
-          color: "#5AC8FA"
-        - entity_id: sensor.floor3_consumption_power
-          name: Floor 3
-          color: "#5AC8FA"
 ```
 
 ---
@@ -154,6 +160,7 @@ sankey:
 | `solar_production` | string | — | PV production sensor |
 | `house_consumption` | string | — | House consumption sensor |
 | `grid_power` | string | — | Grid power sensor (positive = export, negative = import) |
+| `battery_power` | string | — | Battery power sensor (positive = discharging, negative = charging). Adding this enables battery mode. |
 | `arc_show` | boolean | `true` | Show/hide the entire arc section |
 | `arc_title_show` | boolean | `true` | Show/hide the separator bar above arc |
 | `arc_title_icon_show` | boolean | `true` | Show/hide the separator icon |
@@ -167,15 +174,15 @@ sankey:
 | `arc_title_icon_color` | string | `""` | Separator icon color (empty = theme default) |
 | `arc_title_text_color` | string | `""` | Separator text color (empty = theme default) |
 | `arc_text_color` | string | `""` | Color for all text labels in the arc (values, times) |
-| `arc_icon_color` | string | `""` | Color for all node icons (inverter, grid, home) |
+| `arc_icon_color` | string | `""` | Color for all node icons (inverter, grid, home, battery) |
 | `arc_inverter_color` | string | `""` | Background color of the inverter node |
 | `arc_grid_color` | string | `""` | Color of the grid node, glow, flow ovals and ring |
 | `arc_home_color` | string | `""` | Color of the home node, glow and flow ovals |
 | `arc_inactive_color` | string | `""` | Background color of inactive nodes |
 | `arc_sun_flow_color` | string | `""` | Color of solar flow ovals and particles (day) |
 | `arc_moon_flow_color` | string | `""` | Color of solar flow ovals and particles (night) |
-
-> **Note:** Setting `arc_grid_color` affects the grid node background, glow gradient, inverter ring segment and all grid flow ovals/particles in both import and export directions.
+| `arc_battery_discharge_color` | string | `""` | Color of battery node, glow, flow and ring segment when discharging |
+| `arc_battery_charge_color` | string | `""` | Color of battery node, glow and flow when charging |
 
 ### `sankey` block
 
@@ -210,6 +217,35 @@ sankey:
 
 ---
 
+## Battery mode
+
+When `battery_power` is provided, the arc switches to a four-node layout:
+
+```
+        [SUN ARC]
+           │ solar
+         [INV] ──── home ────► [HSE]
+        ╱      ╲ (gutter)
+  grid ╱    bat ╲
+[GRD]          [BAT]
+```
+
+**Grid flow** connects from the bottom of the GRD node, turns right and reaches the left side of INV.
+
+**Battery flow** connects from the bottom of the BAT node, runs along the bottom gutter (same as the home flow) and reaches the bottom-left of INV when discharging, or bottom-left of INV toward BAT when charging.
+
+**Inverter ring** shows three segments when battery is discharging:
+- 🟡 Solar contribution
+- 🟢 Battery discharge contribution  
+- 🔵 Grid import contribution
+
+**Sankey** (auto-generated, no `sections:` required):
+- Battery discharging → "Battery" appears as a source in the left column
+- Battery charging → "Battery" appears as a consumer in the right column
+- Battery idle → not shown in Sankey
+
+---
+
 ## Layouts
 
 ### Horizontal (default)
@@ -234,6 +270,15 @@ The `grid_power` sensor is expected to follow this sign convention:
 | `> 0` | Exporting to grid |
 | `< 0` | Importing from grid |
 
+## Battery power convention
+
+The `battery_power` sensor is expected to follow this sign convention:
+
+| Value | Meaning |
+|-------|---------|
+| `> 0` | Discharging (providing power) |
+| `< 0` | Charging (consuming power) |
+
 If your inverter uses the opposite convention, create a template sensor that negates the value.
 
 ---
@@ -242,3 +287,4 @@ If your inverter uses the opposite convention, create a template sensor that neg
 
 - Home Assistant 2023.x or newer
 - Sensors for PV production, house consumption, and grid power
+- Battery sensor is optional — add `battery_power` to enable the four-node layout
