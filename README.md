@@ -165,6 +165,8 @@ sankey:
 | `arc_title_show` | boolean | `true` | Show/hide the separator bar above arc |
 | `arc_title_icon_show` | boolean | `true` | Show/hide the separator icon |
 | `arc_title_text` | string | `Current State` | Separator label text |
+| `flow_ovals_slow` | integer | `4` | Number of animated ovals on each flow path when animation is slow (low power). Max `4`. |
+| `flow_ovals_fast` | integer | `2` | Number of animated ovals on each flow path when animation is fast (high power). Max `4`. |
 
 ### `arc.style` block
 

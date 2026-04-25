@@ -1,4 +1,4 @@
-// solar-arc-card.js v4r136
+// solar-arc-card.js v4r143
 
 const MDI = {
   generator:   'M6 3C4.89 3 4 3.9 4 5V16H6V17C6 17.55 6.45 18 7 18H8C8.55 18 9 17.55 9 17V16H15V17C15 17.55 15.45 18 16 18H17C17.55 18 18 17.55 18 17V16H20V5C20 3.9 19.11 3 18 3H6M12 7V5H18V7H12M12 9H18V11H12V9M8 5V9H10L7 15V11H5L8 5M22 20V22H2V20H22Z',
@@ -55,6 +55,10 @@ class SolarArcCard extends HTMLElement {
       arc_home_color:       arcStyle.arc_home_color       || '',
       arc_sun_flow_color:   arcStyle.arc_sun_flow_color   || '',
       arc_moon_flow_color:  arcStyle.arc_moon_flow_color  || '',
+
+      // ── Flow ovals ────────────────────────────────────────────────────────
+      arc_flow_ovals_slow: arc.flow_ovals_slow ?? 4,
+      arc_flow_ovals_fast: arc.flow_ovals_fast ?? 2,
 
       // ── Battery ───────────────────────────────────────────────────────────
       battery_entity:               arc.battery_power || '',
@@ -196,7 +200,22 @@ class SolarArcCard extends HTMLElement {
     return len;
   }
 
-  _dur(w) { return 0.4 + 3.1 * (1 - Math.min(Math.abs(w)||0, 9000)/9000); }
+  // Returns particle speed in px/s for a given wattage
+  _speed(w) {
+    const a = Math.abs(w) || 0;
+    if (a <  200) return  15;
+    if (a <  400) return  30;
+    if (a <  600) return  55;
+    if (a <  800) return  85;
+    if (a < 1000) return 120;
+    // above 1000 W: linear 120 → 550 px/s at 9000 W
+    return 120 + 430 * (Math.min(a, 9000) - 1000) / 8000;
+  }
+
+  // Animation duration for a path of given length (px) at wattage w
+  _dur(w, pathLen = 220) {
+    return pathLen / this._speed(w);
+  }
 
   _sunIntensity(pv) {
     if (pv >= 6000) return { opacity: 1.00, rOuter: 28, rMid: 17, rCore: 9 };
@@ -630,65 +649,113 @@ class SolarArcCard extends HTMLElement {
   <!-- GHOSTY g3 (nejdál, nejprůhlednější) -->
   <ellipse id="d-sol-1g3" class="oval og3" rx="4" ry="1.5" fill="#ffd60a" style="offset-path:path('');animation-duration:3.5s;animation-delay:0.24s"/>
   <ellipse id="d-sol-2g3" class="oval og3" rx="4" ry="1.5" fill="#ffd60a" style="offset-path:path('');animation-duration:3.5s;animation-delay:-1.51s"/>
+  <ellipse id="d-sol-3g3" class="oval og3" rx="4" ry="1.5" fill="#ffd60a" style="offset-path:path('');animation-duration:3.5s;animation-delay:0s;visibility:hidden"/>
+  <ellipse id="d-sol-4g3" class="oval og3" rx="4" ry="1.5" fill="#ffd60a" style="offset-path:path('');animation-duration:3.5s;animation-delay:0s;visibility:hidden"/>
   <ellipse id="d-grd-1g3" class="oval og3" rx="4" ry="1.5" fill="#32D74B" style="offset-path:path('${toGrid}');animation-duration:3.5s;animation-delay:0.24s"/>
   <ellipse id="d-grd-2g3" class="oval og3" rx="4" ry="1.5" fill="#32D74B" style="offset-path:path('${toGrid}');animation-duration:3.5s;animation-delay:-1.51s"/>
+  <ellipse id="d-grd-3g3" class="oval og3" rx="4" ry="1.5" fill="#32D74B" style="offset-path:path('${toGrid}');animation-duration:3.5s;animation-delay:0s;visibility:hidden"/>
+  <ellipse id="d-grd-4g3" class="oval og3" rx="4" ry="1.5" fill="#32D74B" style="offset-path:path('${toGrid}');animation-duration:3.5s;animation-delay:0s;visibility:hidden"/>
   <ellipse id="d-imp-1g3" class="oval og3" rx="4" ry="1.5" fill="#0a84ff" style="offset-path:path('${fromGrid}');animation-duration:3.5s;animation-delay:0.24s"/>
   <ellipse id="d-imp-2g3" class="oval og3" rx="4" ry="1.5" fill="#0a84ff" style="offset-path:path('${fromGrid}');animation-duration:3.5s;animation-delay:-1.51s"/>
+  <ellipse id="d-imp-3g3" class="oval og3" rx="4" ry="1.5" fill="#0a84ff" style="offset-path:path('${fromGrid}');animation-duration:3.5s;animation-delay:0s;visibility:hidden"/>
+  <ellipse id="d-imp-4g3" class="oval og3" rx="4" ry="1.5" fill="#0a84ff" style="offset-path:path('${fromGrid}');animation-duration:3.5s;animation-delay:0s;visibility:hidden"/>
   <ellipse id="d-hse-1g3" class="oval og3" rx="4" ry="1.5" fill="#FF9500" style="offset-path:path('${toHouse}');animation-duration:3.5s;animation-delay:0.24s"/>
   <ellipse id="d-hse-2g3" class="oval og3" rx="4" ry="1.5" fill="#FF9500" style="offset-path:path('${toHouse}');animation-duration:3.5s;animation-delay:-1.51s"/>
+  <ellipse id="d-hse-3g3" class="oval og3" rx="4" ry="1.5" fill="#FF9500" style="offset-path:path('${toHouse}');animation-duration:3.5s;animation-delay:0s;visibility:hidden"/>
+  <ellipse id="d-hse-4g3" class="oval og3" rx="4" ry="1.5" fill="#FF9500" style="offset-path:path('${toHouse}');animation-duration:3.5s;animation-delay:0s;visibility:hidden"/>
   ${hasBat ? `
   <ellipse id="d-bat-1g3" class="oval og3" rx="4" ry="1.5" fill="#30D158" style="offset-path:path('${fromBat}');animation-duration:3.5s;animation-delay:0.24s"/>
   <ellipse id="d-bat-2g3" class="oval og3" rx="4" ry="1.5" fill="#30D158" style="offset-path:path('${fromBat}');animation-duration:3.5s;animation-delay:-1.51s"/>
+  <ellipse id="d-bat-3g3" class="oval og3" rx="4" ry="1.5" fill="#30D158" style="offset-path:path('${fromBat}');animation-duration:3.5s;animation-delay:0s;visibility:hidden"/>
+  <ellipse id="d-bat-4g3" class="oval og3" rx="4" ry="1.5" fill="#30D158" style="offset-path:path('${fromBat}');animation-duration:3.5s;animation-delay:0s;visibility:hidden"/>
   <ellipse id="d-chg-1g3" class="oval og3" rx="4" ry="1.5" fill="#30D158" style="offset-path:path('${toBat}');animation-duration:3.5s;animation-delay:0.24s"/>
   <ellipse id="d-chg-2g3" class="oval og3" rx="4" ry="1.5" fill="#30D158" style="offset-path:path('${toBat}');animation-duration:3.5s;animation-delay:-1.51s"/>
+  <ellipse id="d-chg-3g3" class="oval og3" rx="4" ry="1.5" fill="#30D158" style="offset-path:path('${toBat}');animation-duration:3.5s;animation-delay:0s;visibility:hidden"/>
+  <ellipse id="d-chg-4g3" class="oval og3" rx="4" ry="1.5" fill="#30D158" style="offset-path:path('${toBat}');animation-duration:3.5s;animation-delay:0s;visibility:hidden"/>
   ` : ''}
 
   <!-- GHOSTY g2 -->
   <ellipse id="d-sol-1g2" class="oval og2" rx="5.5" ry="2" fill="#ffd60a" style="offset-path:path('');animation-duration:3.5s;animation-delay:0.16s"/>
   <ellipse id="d-sol-2g2" class="oval og2" rx="5.5" ry="2" fill="#ffd60a" style="offset-path:path('');animation-duration:3.5s;animation-delay:-1.59s"/>
+  <ellipse id="d-sol-3g2" class="oval og2" rx="5.5" ry="2" fill="#ffd60a" style="offset-path:path('');animation-duration:3.5s;animation-delay:0s;visibility:hidden"/>
+  <ellipse id="d-sol-4g2" class="oval og2" rx="5.5" ry="2" fill="#ffd60a" style="offset-path:path('');animation-duration:3.5s;animation-delay:0s;visibility:hidden"/>
   <ellipse id="d-grd-1g2" class="oval og2" rx="5.5" ry="2" fill="#32D74B" style="offset-path:path('${toGrid}');animation-duration:3.5s;animation-delay:0.16s"/>
   <ellipse id="d-grd-2g2" class="oval og2" rx="5.5" ry="2" fill="#32D74B" style="offset-path:path('${toGrid}');animation-duration:3.5s;animation-delay:-1.59s"/>
+  <ellipse id="d-grd-3g2" class="oval og2" rx="5.5" ry="2" fill="#32D74B" style="offset-path:path('${toGrid}');animation-duration:3.5s;animation-delay:0s;visibility:hidden"/>
+  <ellipse id="d-grd-4g2" class="oval og2" rx="5.5" ry="2" fill="#32D74B" style="offset-path:path('${toGrid}');animation-duration:3.5s;animation-delay:0s;visibility:hidden"/>
   <ellipse id="d-imp-1g2" class="oval og2" rx="5.5" ry="2" fill="#0084FF" style="offset-path:path('${fromGrid}');animation-duration:3.5s;animation-delay:0.16s"/>
   <ellipse id="d-imp-2g2" class="oval og2" rx="5.5" ry="2" fill="#0084FF" style="offset-path:path('${fromGrid}');animation-duration:3.5s;animation-delay:-1.59s"/>
+  <ellipse id="d-imp-3g2" class="oval og2" rx="5.5" ry="2" fill="#0084FF" style="offset-path:path('${fromGrid}');animation-duration:3.5s;animation-delay:0s;visibility:hidden"/>
+  <ellipse id="d-imp-4g2" class="oval og2" rx="5.5" ry="2" fill="#0084FF" style="offset-path:path('${fromGrid}');animation-duration:3.5s;animation-delay:0s;visibility:hidden"/>
   <ellipse id="d-hse-1g2" class="oval og2" rx="5.5" ry="2" fill="#ff9500" style="offset-path:path('${toHouse}');animation-duration:3.5s;animation-delay:0.16s"/>
   <ellipse id="d-hse-2g2" class="oval og2" rx="5.5" ry="2" fill="#ff9500" style="offset-path:path('${toHouse}');animation-duration:3.5s;animation-delay:-1.59s"/>
+  <ellipse id="d-hse-3g2" class="oval og2" rx="5.5" ry="2" fill="#ff9500" style="offset-path:path('${toHouse}');animation-duration:3.5s;animation-delay:0s;visibility:hidden"/>
+  <ellipse id="d-hse-4g2" class="oval og2" rx="5.5" ry="2" fill="#ff9500" style="offset-path:path('${toHouse}');animation-duration:3.5s;animation-delay:0s;visibility:hidden"/>
   ${hasBat ? `
   <ellipse id="d-bat-1g2" class="oval og2" rx="5.5" ry="2" fill="#30D158" style="offset-path:path('${fromBat}');animation-duration:3.5s;animation-delay:0.16s"/>
   <ellipse id="d-bat-2g2" class="oval og2" rx="5.5" ry="2" fill="#30D158" style="offset-path:path('${fromBat}');animation-duration:3.5s;animation-delay:-1.59s"/>
+  <ellipse id="d-bat-3g2" class="oval og2" rx="5.5" ry="2" fill="#30D158" style="offset-path:path('${fromBat}');animation-duration:3.5s;animation-delay:0s;visibility:hidden"/>
+  <ellipse id="d-bat-4g2" class="oval og2" rx="5.5" ry="2" fill="#30D158" style="offset-path:path('${fromBat}');animation-duration:3.5s;animation-delay:0s;visibility:hidden"/>
   <ellipse id="d-chg-1g2" class="oval og2" rx="5.5" ry="2" fill="#30D158" style="offset-path:path('${toBat}');animation-duration:3.5s;animation-delay:0.16s"/>
   <ellipse id="d-chg-2g2" class="oval og2" rx="5.5" ry="2" fill="#30D158" style="offset-path:path('${toBat}');animation-duration:3.5s;animation-delay:-1.59s"/>
+  <ellipse id="d-chg-3g2" class="oval og2" rx="5.5" ry="2" fill="#30D158" style="offset-path:path('${toBat}');animation-duration:3.5s;animation-delay:0s;visibility:hidden"/>
+  <ellipse id="d-chg-4g2" class="oval og2" rx="5.5" ry="2" fill="#30D158" style="offset-path:path('${toBat}');animation-duration:3.5s;animation-delay:0s;visibility:hidden"/>
   ` : ''}
 
   <!-- GHOSTY g1 (nejblíž hlavě) -->
   <ellipse id="d-sol-1g1" class="oval og1" rx="6.5" ry="2.2" fill="#ffd60a" style="offset-path:path('');animation-duration:3.5s;animation-delay:0.08s"/>
   <ellipse id="d-sol-2g1" class="oval og1" rx="6.5" ry="2.2" fill="#ffd60a" style="offset-path:path('');animation-duration:3.5s;animation-delay:-1.67s"/>
+  <ellipse id="d-sol-3g1" class="oval og1" rx="6.5" ry="2.2" fill="#ffd60a" style="offset-path:path('');animation-duration:3.5s;animation-delay:0s;visibility:hidden"/>
+  <ellipse id="d-sol-4g1" class="oval og1" rx="6.5" ry="2.2" fill="#ffd60a" style="offset-path:path('');animation-duration:3.5s;animation-delay:0s;visibility:hidden"/>
   <ellipse id="d-grd-1g1" class="oval og1" rx="6.5" ry="2.2" fill="#32D74B" style="offset-path:path('${toGrid}');animation-duration:3.5s;animation-delay:0.08s"/>
   <ellipse id="d-grd-2g1" class="oval og1" rx="6.5" ry="2.2" fill="#32D74B" style="offset-path:path('${toGrid}');animation-duration:3.5s;animation-delay:-1.67s"/>
+  <ellipse id="d-grd-3g1" class="oval og1" rx="6.5" ry="2.2" fill="#32D74B" style="offset-path:path('${toGrid}');animation-duration:3.5s;animation-delay:0s;visibility:hidden"/>
+  <ellipse id="d-grd-4g1" class="oval og1" rx="6.5" ry="2.2" fill="#32D74B" style="offset-path:path('${toGrid}');animation-duration:3.5s;animation-delay:0s;visibility:hidden"/>
   <ellipse id="d-imp-1g1" class="oval og1" rx="6.5" ry="2.2" fill="#0084FF" style="offset-path:path('${fromGrid}');animation-duration:3.5s;animation-delay:0.08s"/>
   <ellipse id="d-imp-2g1" class="oval og1" rx="6.5" ry="2.2" fill="#0084FF" style="offset-path:path('${fromGrid}');animation-duration:3.5s;animation-delay:-1.67s"/>
+  <ellipse id="d-imp-3g1" class="oval og1" rx="6.5" ry="2.2" fill="#0084FF" style="offset-path:path('${fromGrid}');animation-duration:3.5s;animation-delay:0s;visibility:hidden"/>
+  <ellipse id="d-imp-4g1" class="oval og1" rx="6.5" ry="2.2" fill="#0084FF" style="offset-path:path('${fromGrid}');animation-duration:3.5s;animation-delay:0s;visibility:hidden"/>
   <ellipse id="d-hse-1g1" class="oval og1" rx="6.5" ry="2.2" fill="#ff9500" style="offset-path:path('${toHouse}');animation-duration:3.5s;animation-delay:0.08s"/>
   <ellipse id="d-hse-2g1" class="oval og1" rx="6.5" ry="2.2" fill="#ff9500" style="offset-path:path('${toHouse}');animation-duration:3.5s;animation-delay:-1.67s"/>
+  <ellipse id="d-hse-3g1" class="oval og1" rx="6.5" ry="2.2" fill="#ff9500" style="offset-path:path('${toHouse}');animation-duration:3.5s;animation-delay:0s;visibility:hidden"/>
+  <ellipse id="d-hse-4g1" class="oval og1" rx="6.5" ry="2.2" fill="#ff9500" style="offset-path:path('${toHouse}');animation-duration:3.5s;animation-delay:0s;visibility:hidden"/>
   ${hasBat ? `
   <ellipse id="d-bat-1g1" class="oval og1" rx="6.5" ry="2.2" fill="#30D158" style="offset-path:path('${fromBat}');animation-duration:3.5s;animation-delay:0.08s"/>
   <ellipse id="d-bat-2g1" class="oval og1" rx="6.5" ry="2.2" fill="#30D158" style="offset-path:path('${fromBat}');animation-duration:3.5s;animation-delay:-1.67s"/>
+  <ellipse id="d-bat-3g1" class="oval og1" rx="6.5" ry="2.2" fill="#30D158" style="offset-path:path('${fromBat}');animation-duration:3.5s;animation-delay:0s;visibility:hidden"/>
+  <ellipse id="d-bat-4g1" class="oval og1" rx="6.5" ry="2.2" fill="#30D158" style="offset-path:path('${fromBat}');animation-duration:3.5s;animation-delay:0s;visibility:hidden"/>
   <ellipse id="d-chg-1g1" class="oval og1" rx="6.5" ry="2.2" fill="#30D158" style="offset-path:path('${toBat}');animation-duration:3.5s;animation-delay:0.08s"/>
   <ellipse id="d-chg-2g1" class="oval og1" rx="6.5" ry="2.2" fill="#30D158" style="offset-path:path('${toBat}');animation-duration:3.5s;animation-delay:-1.67s"/>
+  <ellipse id="d-chg-3g1" class="oval og1" rx="6.5" ry="2.2" fill="#30D158" style="offset-path:path('${toBat}');animation-duration:3.5s;animation-delay:0s;visibility:hidden"/>
+  <ellipse id="d-chg-4g1" class="oval og1" rx="6.5" ry="2.2" fill="#30D158" style="offset-path:path('${toBat}');animation-duration:3.5s;animation-delay:0s;visibility:hidden"/>
   ` : ''}
 
   <!-- HLAVY -->
   <ellipse id="d-sol-1" class="oval" rx="7" ry="2.5" fill="#ffd60a" filter="url(#gd)" style="offset-path:path('');animation-duration:3.5s"/>
   <ellipse id="d-sol-2" class="oval" rx="7" ry="2.5" fill="#ffd60a" filter="url(#gd)" style="offset-path:path('');animation-duration:3.5s;animation-delay:-1.75s"/>
+  <ellipse id="d-sol-3" class="oval" rx="7" ry="2.5" fill="#ffd60a" filter="url(#gd)" style="offset-path:path('');animation-duration:3.5s;visibility:hidden"/>
+  <ellipse id="d-sol-4" class="oval" rx="7" ry="2.5" fill="#ffd60a" filter="url(#gd)" style="offset-path:path('');animation-duration:3.5s;visibility:hidden"/>
   <ellipse id="d-grd-1" class="oval" rx="7" ry="2.5" fill="#32D74B" filter="url(#gd)" style="offset-path:path('${toGrid}');animation-duration:3.5s"/>
   <ellipse id="d-grd-2" class="oval" rx="7" ry="2.5" fill="#32D74B" filter="url(#gd)" style="offset-path:path('${toGrid}');animation-duration:3.5s;animation-delay:-1.75s"/>
+  <ellipse id="d-grd-3" class="oval" rx="7" ry="2.5" fill="#32D74B" filter="url(#gd)" style="offset-path:path('${toGrid}');animation-duration:3.5s;visibility:hidden"/>
+  <ellipse id="d-grd-4" class="oval" rx="7" ry="2.5" fill="#32D74B" filter="url(#gd)" style="offset-path:path('${toGrid}');animation-duration:3.5s;visibility:hidden"/>
   <ellipse id="d-imp-1" class="oval" rx="7" ry="2.5" fill="#0084FF" filter="url(#gd)" style="offset-path:path('${fromGrid}');animation-duration:3.5s"/>
   <ellipse id="d-imp-2" class="oval" rx="7" ry="2.5" fill="#0084FF" filter="url(#gd)" style="offset-path:path('${fromGrid}');animation-duration:3.5s;animation-delay:-1.75s"/>
+  <ellipse id="d-imp-3" class="oval" rx="7" ry="2.5" fill="#0084FF" filter="url(#gd)" style="offset-path:path('${fromGrid}');animation-duration:3.5s;visibility:hidden"/>
+  <ellipse id="d-imp-4" class="oval" rx="7" ry="2.5" fill="#0084FF" filter="url(#gd)" style="offset-path:path('${fromGrid}');animation-duration:3.5s;visibility:hidden"/>
   <ellipse id="d-hse-1" class="oval" rx="7" ry="2.5" fill="#ff9500" filter="url(#gd)" style="offset-path:path('${toHouse}');animation-duration:3.5s"/>
   <ellipse id="d-hse-2" class="oval" rx="7" ry="2.5" fill="#ff9500" filter="url(#gd)" style="offset-path:path('${toHouse}');animation-duration:3.5s;animation-delay:-1.75s"/>
+  <ellipse id="d-hse-3" class="oval" rx="7" ry="2.5" fill="#ff9500" filter="url(#gd)" style="offset-path:path('${toHouse}');animation-duration:3.5s;visibility:hidden"/>
+  <ellipse id="d-hse-4" class="oval" rx="7" ry="2.5" fill="#ff9500" filter="url(#gd)" style="offset-path:path('${toHouse}');animation-duration:3.5s;visibility:hidden"/>
   ${hasBat ? `
   <ellipse id="d-bat-1" class="oval" rx="7" ry="2.5" fill="#30D158" filter="url(#gd)" style="offset-path:path('${fromBat}');animation-duration:3.5s"/>
   <ellipse id="d-bat-2" class="oval" rx="7" ry="2.5" fill="#30D158" filter="url(#gd)" style="offset-path:path('${fromBat}');animation-duration:3.5s;animation-delay:-1.75s"/>
+  <ellipse id="d-bat-3" class="oval" rx="7" ry="2.5" fill="#30D158" filter="url(#gd)" style="offset-path:path('${fromBat}');animation-duration:3.5s;visibility:hidden"/>
+  <ellipse id="d-bat-4" class="oval" rx="7" ry="2.5" fill="#30D158" filter="url(#gd)" style="offset-path:path('${fromBat}');animation-duration:3.5s;visibility:hidden"/>
   <ellipse id="d-chg-1" class="oval" rx="7" ry="2.5" fill="#30D158" filter="url(#gd)" style="offset-path:path('${toBat}');animation-duration:3.5s"/>
   <ellipse id="d-chg-2" class="oval" rx="7" ry="2.5" fill="#30D158" filter="url(#gd)" style="offset-path:path('${toBat}');animation-duration:3.5s;animation-delay:-1.75s"/>
+  <ellipse id="d-chg-3" class="oval" rx="7" ry="2.5" fill="#30D158" filter="url(#gd)" style="offset-path:path('${toBat}');animation-duration:3.5s;visibility:hidden"/>
+  <ellipse id="d-chg-4" class="oval" rx="7" ry="2.5" fill="#30D158" filter="url(#gd)" style="offset-path:path('${toBat}');animation-duration:3.5s;visibility:hidden"/>
   ` : ''}
 
   <!-- PARTICLES — translateY shifts perpendicular to path (offset-rotate:auto local space) -->
@@ -803,6 +870,22 @@ class SolarArcCard extends HTMLElement {
     const bat          = hasBat ? this._val(this._config.battery_entity) : 0;
     const isDischarging = hasBat && bat > 10;
     const isCharging    = hasBat && bat < -10;
+
+    // Path lengths in px — used to normalise animation speed across different-length routes
+    // Quarter-circle corner r=13 ≈ π*13/2 ≈ 20.4 px
+    const PL = hasBat ? {
+      sol: 190,   // bezier solar→INV (battery layout, INV higher)
+      grd: 130,   // M162,215 → L65 (97) + arc (20) + L52,190 (12)
+      imp: 130,
+      hse: 325,   // M205,253 → down (82) + arc + across (117) + arc + up (85)
+      bat: 245,   // M52,330 → down (5) + arc + across (117) + arc + up (82)
+      chg: 245,
+    } : {
+      sol: 220,   // bezier solar→INV (standard layout)
+      grd: 265,   // M195,282.7 → down (17) + arc + across (117) + arc + up (90)
+      imp: 265,
+      hse: 265,   // symmetric to grd
+    };
     const tz    = this._hass.config?.time_zone;
     const sunAttrs = this._hass.states[this._config.sun_entity]?.attributes || {};
     const isDay  = this._isDay();
@@ -838,7 +921,7 @@ class SolarArcCard extends HTMLElement {
         sr.querySelector('#p-solar').setAttribute('d', moonPath);
         sr.querySelector('#p-solar').style.stroke = solStroke;
         solIds.forEach(id => { const e = sr.querySelector(id); if (e) { e.style.offsetPath = `path('${moonPath}')`; e.setAttribute('fill', solColor); } });
-        this._setParticles(sr, 'sol', solColor, true, this._dur(pv), moonPath);
+        this._setParticles(sr, 'sol', solColor, true, this._dur(pv, PL.sol), moonPath, PL.sol);
         // Pill u měsíce
         const pillX = mp[0] + 94 > 390 ? mp[0] - 94 : mp[0] + 14;
         moonPill.setAttribute('transform', `translate(${f(pillX)},${f(mp[1]-16)})`);
@@ -847,7 +930,7 @@ class SolarArcCard extends HTMLElement {
       } else {
         sr.querySelector('#p-solar').setAttribute('d', '');
         sr.querySelector('#p-solar').style.stroke = 'transparent';
-        this._setParticles(sr, 'sol', solColor, false, this._dur(pv));
+        this._setParticles(sr, 'sol', solColor, false, this._dur(pv, PL.sol), undefined, PL.sol);
         moonPill.setAttribute('opacity', '0');
       }
     }
@@ -884,7 +967,7 @@ class SolarArcCard extends HTMLElement {
       sr.querySelector('#p-solar').setAttribute('d', solarPath);
       sr.querySelector('#p-solar').style.stroke = isProd ? solStroke : 'transparent';
       solIds.forEach(id => { const e = sr.querySelector(id); if (e) { e.style.offsetPath = `path('${solarPath}')`; e.setAttribute('fill', solColor); } });
-      this._setParticles(sr, 'sol', solColor, isProd, this._dur(pv), solarPath);
+      this._setParticles(sr, 'sol', solColor, isProd, this._dur(pv, PL.sol), solarPath, PL.sol);
     }
 
     if (sunAttrs.next_rising && sunAttrs.next_setting) {
@@ -905,10 +988,10 @@ class SolarArcCard extends HTMLElement {
     const impColor = cfg.arc_grid_color || '#0084FF';
     const hseColor = cfg.arc_home_color || '#FF9500';
 
-    this._setFlow(sr, ['#d-sol-1','#d-sol-2'], isProd,     this._dur(pv));
-    this._setFlow(sr, ['#d-grd-1','#d-grd-2'], isExport,   this._dur(grid));
-    this._setFlow(sr, ['#d-imp-1','#d-imp-2'], isImport,   this._dur(grid));
-    this._setFlow(sr, ['#d-hse-1','#d-hse-2'], house > 20, this._dur(house));
+    this._setFlow(sr, ['#d-sol-1','#d-sol-2','#d-sol-3','#d-sol-4'], isProd,     this._dur(pv,    PL.sol), PL.sol);
+    this._setFlow(sr, ['#d-grd-1','#d-grd-2','#d-grd-3','#d-grd-4'], isExport,   this._dur(grid,  PL.grd), PL.grd);
+    this._setFlow(sr, ['#d-imp-1','#d-imp-2','#d-imp-3','#d-imp-4'], isImport,   this._dur(grid,  PL.imp), PL.imp);
+    this._setFlow(sr, ['#d-hse-1','#d-hse-2','#d-hse-3','#d-hse-4'], house > 20, this._dur(house, PL.hse), PL.hse);
 
     // Hlavy oválků — barva se jinak nemění po _buildDOM, musíme je aktualizovat
     if (cfg.arc_grid_color) {
@@ -917,9 +1000,9 @@ class SolarArcCard extends HTMLElement {
     }
     if (cfg.arc_home_color) this._setOvalColor(sr, 'hse', hseColor);
 
-    this._setParticles(sr, 'grd', grdColor, isExport,   this._dur(grid));
-    this._setParticles(sr, 'imp', impColor, isImport,   this._dur(grid));
-    this._setParticles(sr, 'hse', hseColor, house > 20, this._dur(house));
+    this._setParticles(sr, 'grd', grdColor, isExport,   this._dur(grid,  PL.grd), undefined, PL.grd);
+    this._setParticles(sr, 'imp', impColor, isImport,   this._dur(grid,  PL.imp), undefined, PL.imp);
+    this._setParticles(sr, 'hse', hseColor, house > 20, this._dur(house, PL.hse), undefined, PL.hse);
 
     sr.querySelector('#p-from-grid').style.stroke = isImport ? 'rgba(255,255,255,0.12)' : 'transparent';
     sr.querySelector('#p-to-grid').style.stroke   = 'rgba(255,255,255,0.12)';
@@ -1008,10 +1091,10 @@ class SolarArcCard extends HTMLElement {
       // Oval flow
       if (cfg.arc_battery_discharge_color) this._setOvalColor(sr, 'bat', batDisColor);
       if (cfg.arc_battery_charge_color)    this._setOvalColor(sr, 'chg', batChgColor);
-      this._setFlow(sr, ['#d-bat-1','#d-bat-2'], isDischarging, this._dur(bat));
-      this._setFlow(sr, ['#d-chg-1','#d-chg-2'], isCharging,    this._dur(Math.abs(bat)));
-      this._setParticles(sr, 'bat', batDisColor, isDischarging, this._dur(bat));
-      this._setParticles(sr, 'chg', batChgColor, isCharging,    this._dur(Math.abs(bat)));
+      this._setFlow(sr, ['#d-bat-1','#d-bat-2','#d-bat-3','#d-bat-4'], isDischarging, this._dur(bat,            PL.bat), PL.bat);
+      this._setFlow(sr, ['#d-chg-1','#d-chg-2','#d-chg-3','#d-chg-4'], isCharging,    this._dur(Math.abs(bat), PL.chg), PL.chg);
+      this._setParticles(sr, 'bat', batDisColor, isDischarging, this._dur(bat,              PL.bat), undefined, PL.bat);
+      this._setParticles(sr, 'chg', batChgColor, isCharging,    this._dur(Math.abs(bat),   PL.chg), undefined, PL.chg);
 
       // Dim paths
       const pFromBat = sr.querySelector('#p-from-bat');
@@ -1679,22 +1762,27 @@ class SolarArcCard extends HTMLElement {
     }
   }
 
-  _setFlow(sr, ids, visible, dur) {
+  _setFlow(sr, ids, visible, dur, pathLen = 220) {
+    // Oval count: more on longer/slower paths, fewer on shorter/faster ones
+    const maxN = (pathLen >= 200 && dur >= 1.0)
+      ? (this._config?.arc_flow_ovals_slow ?? 4)
+      : (this._config?.arc_flow_ovals_fast ?? 2);
+    const n    = Math.min(ids.length, maxN);
     const d    = dur.toFixed(2);
-    const half = parseFloat((dur / 2).toFixed(2));
     const gOff = [dur * 0.025, dur * 0.05, dur * 0.075];
     ids.forEach((sel, i) => {
-      const base = i === 1 ? -half : 0;
+      const show = visible && i < n;
+      const base = -(dur * i / n);   // evenly spaced: 0, -T/n, -2T/n, -3T/n
       const el = sr.querySelector(sel);
       if (el) {
-        el.style.visibility        = visible ? 'visible' : 'hidden';
+        el.style.visibility        = show ? 'visible' : 'hidden';
         el.style.animationDuration = `${d}s`;
         el.style.animationDelay    = `${base.toFixed(2)}s`;
       }
       gOff.forEach((off, gi) => {
         const g = sr.querySelector(`${sel}g${gi + 1}`);
         if (g) {
-          g.style.visibility        = visible ? 'visible' : 'hidden';
+          g.style.visibility        = show ? 'visible' : 'hidden';
           g.style.animationDuration = `${d}s`;
           g.style.animationDelay    = `${(base + off).toFixed(2)}s`;
         }
@@ -1702,17 +1790,19 @@ class SolarArcCard extends HTMLElement {
     });
   }
 
-  _setParticles(sr, prefix, color, visible, dur, path) {
+  _setParticles(sr, prefix, color, visible, dur, path, pathLen = 220) {
+    // Number of visible particles scales with path length for consistent visual density
+    const np = pathLen >= 320 ? 8 : pathLen >= 250 ? 6 : pathLen >= 180 ? 4 : 2;
     // phases evenly distributed: 0.15, 0.65, 0.35, 0.85, 0.55, 0.05, 0.75, 0.25
     const configs = [
       { n: 1, vis: visible,              del: dur *  0.15 },
       { n: 2, vis: visible,              del: dur * -0.35 },
-      { n: 3, vis: visible && dur < 2.8, del: dur *  0.35 },
-      { n: 4, vis: visible && dur < 2.8, del: dur * -0.15 },
-      { n: 5, vis: visible && dur < 2.0, del: dur *  0.55 },
-      { n: 6, vis: visible && dur < 2.0, del: dur *  0.05 },
-      { n: 7, vis: visible && dur < 1.3, del: dur *  0.75 },
-      { n: 8, vis: visible && dur < 1.3, del: dur *  0.25 },
+      { n: 3, vis: visible && np >= 4,   del: dur *  0.35 },
+      { n: 4, vis: visible && np >= 4,   del: dur * -0.15 },
+      { n: 5, vis: visible && np >= 6,   del: dur *  0.55 },
+      { n: 6, vis: visible && np >= 6,   del: dur *  0.05 },
+      { n: 7, vis: visible && np >= 8,   del: dur *  0.75 },
+      { n: 8, vis: visible && np >= 8,   del: dur *  0.25 },
     ];
     configs.forEach(({ n, vis, del }) => {
       const el = sr.querySelector(`#dp-${prefix}-${n}`);
