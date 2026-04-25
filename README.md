@@ -93,6 +93,9 @@ arc:
   arc_title_icon_show: true
   arc_title_text: "Current State"
 
+  flow_ovals_slow: 4
+  flow_ovals_fast: 2
+
   style:
     arc_title_icon: mdi:flash
     arc_title_icon_color: "#FFD60A"
