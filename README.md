@@ -21,11 +21,13 @@ Custom Lovelace card for Home Assistant that combines two visualizations in one:
 - **Battery node** — optional fourth node with charge/discharge flow and ring segment
 - Day/night mode with clouds, stars, moon and pill label
 - Glassmorphism card design
+- **Two flow styles** — `oval` (classic animated ovals) or `laser` (laser beam with glowing head and gradient trail)
 - Fully configurable Sankey diagram with unlimited sections and entities
 - Sankey supports **horizontal** and **vertical** layout
 - Customizable section separators (icon, color, text)
 - Full color theming for arc nodes, flows, glows and ring
 - Each section (arc / sankey) can be independently shown or hidden
+- **Visual UI editor** — configure arc entities, display, flow and colors without writing YAML
 
 ---
 
@@ -93,8 +95,9 @@ arc:
   arc_title_icon_show: true
   arc_title_text: "Current State"
 
-  flow_ovals_slow: 4
-  flow_ovals_fast: 2
+  flow_style: oval
+  flow_count_slow: 4
+  flow_count_fast: 2
 
   style:
     arc_title_icon: mdi:flash
@@ -168,8 +171,9 @@ sankey:
 | `arc_title_show` | boolean | `true` | Show/hide the separator bar above arc |
 | `arc_title_icon_show` | boolean | `true` | Show/hide the separator icon |
 | `arc_title_text` | string | `Current State` | Separator label text |
-| `flow_ovals_slow` | integer | `4` | Number of animated ovals on each flow path when animation is slow (low power). Max `4`. |
-| `flow_ovals_fast` | integer | `2` | Number of animated ovals on each flow path when animation is fast (high power). Max `4`. |
+| `flow_style` | string | `oval` | Flow animation style — `oval` (classic animated ovals) or `laser` (laser beam with glowing head and gradient trail) |
+| `flow_count_slow` | integer | `4` | Number of animated ovals/beams on each flow path when animation is slow (low power). Max `4`. |
+| `flow_count_fast` | integer | `2` | Number of animated ovals/beams on each flow path when animation is fast (high power). Max `4`. |
 
 ### `arc.style` block
 
@@ -181,11 +185,11 @@ sankey:
 | `arc_text_color` | string | `""` | Color for all text labels in the arc (values, times) |
 | `arc_icon_color` | string | `""` | Color for all node icons (inverter, grid, home, battery) |
 | `arc_inverter_color` | string | `""` | Background color of the inverter node |
-| `arc_grid_color` | string | `""` | Color of the grid node, glow, flow ovals and ring |
-| `arc_home_color` | string | `""` | Color of the home node, glow and flow ovals |
+| `arc_grid_color` | string | `""` | Color of the grid node, glow, flow and ring |
+| `arc_home_color` | string | `""` | Color of the home node, glow and flow |
 | `arc_inactive_color` | string | `""` | Background color of inactive nodes |
-| `arc_sun_flow_color` | string | `""` | Color of solar flow ovals and particles (day) |
-| `arc_moon_flow_color` | string | `""` | Color of solar flow ovals and particles (night) |
+| `arc_sun_flow_color` | string | `""` | Color of solar flow (day) |
+| `arc_moon_flow_color` | string | `""` | Color of solar flow (night) |
 | `arc_battery_discharge_color` | string | `""` | Color of battery node, glow, flow and ring segment when discharging |
 | `arc_battery_charge_color` | string | `""` | Color of battery node, glow and flow when charging |
 
@@ -248,6 +252,24 @@ When `battery_power` is provided, the arc switches to a four-node layout:
 - Battery discharging → "Battery" appears as a source in the left column
 - Battery charging → "Battery" appears as a consumer in the right column
 - Battery idle → not shown in Sankey
+
+---
+
+## Visual UI editor
+
+The card includes a built-in visual editor accessible from the HA dashboard card picker (click the pencil icon on the card).
+
+### Arc tab
+- **Entities** — entity IDs for solar production, house consumption, grid power and battery power (text fields)
+- **Display** — toggles for arc section visibility, separator bar, separator icon; separator label text
+- **Flow** — flow style (`oval` / `laser`), slow and fast beam/oval counts
+- **Colors** — all `arc.style` color options with a preset palette and a custom color picker per field
+
+### Sankey tab
+- **Display** — toggles for sankey section visibility, separator bar, separator icon; separator label text; layout (`horizontal` / `vertical`)
+- **Sections (YAML)** — raw YAML editor for the `sections` list (entities, names, colors, children)
+
+> **Tip:** All changes in the UI editor are applied instantly — no need to save separately.
 
 ---
 

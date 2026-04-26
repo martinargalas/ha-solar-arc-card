@@ -1,4 +1,4 @@
-// solar-arc-card.js v4r143
+// solar-arc-card.js v4r163
 
 const MDI = {
   generator:   'M6 3C4.89 3 4 3.9 4 5V16H6V17C6 17.55 6.45 18 7 18H8C8.55 18 9 17.55 9 17V16H15V17C15 17.55 15.45 18 16 18H17C17.55 18 18 17.55 18 17V16H20V5C20 3.9 19.11 3 18 3H6M12 7V5H18V7H12M12 9H18V11H12V9M8 5V9H10L7 15V11H5L8 5M22 20V22H2V20H22Z',
@@ -56,9 +56,10 @@ class SolarArcCard extends HTMLElement {
       arc_sun_flow_color:   arcStyle.arc_sun_flow_color   || '',
       arc_moon_flow_color:  arcStyle.arc_moon_flow_color  || '',
 
-      // ── Flow ovals ────────────────────────────────────────────────────────
-      arc_flow_ovals_slow: arc.flow_ovals_slow ?? 4,
-      arc_flow_ovals_fast: arc.flow_ovals_fast ?? 2,
+      // ── Flow style + count ────────────────────────────────────────────────
+      arc_flow_style:      arc.flow_style       || 'oval',   // 'oval' | 'laser'
+      arc_flow_count_slow: arc.flow_count_slow  ?? arc.flow_ovals_slow ?? 4,
+      arc_flow_count_fast: arc.flow_count_fast  ?? arc.flow_ovals_fast ?? 2,
 
       // ── Battery ───────────────────────────────────────────────────────────
       battery_entity:               arc.battery_power || '',
@@ -136,6 +137,12 @@ class SolarArcCard extends HTMLElement {
   }
 
   getCardSize() { return 4; }
+
+  static getConfigElement() { return document.createElement('solar-arc-card-editor'); }
+
+  static getStubConfig() {
+    return { arc: {}, sankey: {} };
+  }
 
   _val(id)  { return parseFloat(this._hass?.states[id]?.state ?? 0) || 0; }
 
@@ -400,6 +407,24 @@ class SolarArcCard extends HTMLElement {
   .og2 { --oval-max-op: 0.25; }
   .og3 { --oval-max-op: 0.10; }
 
+  @keyframes laser-mo {
+    0%   { offset-distance: 0%;   opacity: 0; }
+    8%   { offset-distance: 8%;   opacity: 1; }
+    92%  { offset-distance: 92%;  opacity: 1; }
+    100% { offset-distance: 100%; opacity: 0; }
+  }
+  .lseg {
+    offset-distance: 0%; offset-rotate: auto;
+    transform-box: fill-box; transform-origin: center;
+    animation: laser-mo linear infinite; visibility: hidden;
+  }
+  /* Trail circles — same motion, group <g> controls visibility+blur */
+  .ltrl {
+    offset-distance: 0%; offset-rotate: auto;
+    transform-box: fill-box; transform-origin: center;
+    animation: laser-mo linear infinite;
+  }
+
   #inv-ring-solar, #inv-ring-grid, #inv-ring-bat {
     transition: stroke-dasharray 1s ease, stroke-dashoffset 1s ease,
                 stroke 0.5s ease, opacity 0.4s ease;
@@ -471,6 +496,26 @@ class SolarArcCard extends HTMLElement {
     <filter id="gd" x="-150%" y="-150%" width="400%" height="400%">
       <feGaussianBlur stdDeviation="3.5" result="b"/>
       <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <!-- Laser head: wide outer glow + tight inner glow + sharp head = flash effect -->
+    <filter id="lh" x="-300%" y="-300%" width="700%" height="700%">
+      <feGaussianBlur stdDeviation="8" result="b1"/>
+      <feGaussianBlur in="SourceGraphic" stdDeviation="2.5" result="b2"/>
+      <feMerge><feMergeNode in="b1"/><feMergeNode in="b2"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <!-- Laser white hot core: tight bright glow around the white tip ellipse -->
+    <filter id="lw" x="-300%" y="-300%" width="700%" height="700%">
+      <feGaussianBlur stdDeviation="3.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <!-- Gradient for laser core: transparent (trailing) → white (leading tip) -->
+    <linearGradient id="lcore-grad" gradientUnits="objectBoundingBox" x1="0" y1="0.5" x2="1" y2="0.5">
+      <stop offset="0%"   stop-color="white" stop-opacity="0"/>
+      <stop offset="50%"  stop-color="white" stop-opacity="0.35"/>
+      <stop offset="100%" stop-color="white" stop-opacity="1"/>
+    </linearGradient>
+    <filter id="lt" x="-100%" y="-100%" width="300%" height="300%">
+      <feGaussianBlur stdDeviation="1.5"/>
     </filter>
     <filter id="gi" x="-80%" y="-80%" width="260%" height="260%">
       <feGaussianBlur stdDeviation="2.5" result="b"/>
@@ -758,6 +803,39 @@ class SolarArcCard extends HTMLElement {
   <ellipse id="d-chg-4" class="oval" rx="7" ry="2.5" fill="#30D158" filter="url(#gd)" style="offset-path:path('${toBat}');animation-duration:3.5s;visibility:hidden"/>
   ` : ''}
 
+  <!-- LASER SEGMENTS — per beam: 1 oval head (.lseg) + group <g filter=#lt> with 40 circles (.ltrl) -->
+  <!-- Group blur: 1 filter pass per beam instead of 56 — major GPU savings -->
+  ${(() => {
+    const N_TAIL = 56;
+    const mkSegs = (p, path, col) => {
+      let h = '';
+      for (let b = 0; b < 2; b++) {
+        // Oval head — colored base with wide glow, then white hot core on top
+        h += `<ellipse id="dl-${p}-${b}-0" class="lseg" rx="7" ry="2.5" fill-opacity="1" fill="${col}" style="offset-path:${path};animation-duration:3.5s;" filter="url(#lh)"/>\n  `;
+        h += `<ellipse id="dl-${p}-${b}-core" class="lseg" rx="3.5" ry="1.2" fill="url(#lcore-grad)" style="offset-path:${path};animation-duration:3.5s;transform:translateX(3.5px);" filter="url(#lw)"/>\n  `;
+        // Trail group — ONE blur filter for all circles; group visibility controls beam
+        h += `<g id="dl-trail-${p}-${b}" filter="url(#lt)" style="visibility:hidden">\n  `;
+        for (let s = 0; s < N_TAIL; s++) {
+          const r  = +(2.5 - s * 2.2 / (N_TAIL - 1)).toFixed(2);
+          const op = +(0.85 * Math.pow(1 - s / N_TAIL, 0.55)).toFixed(4);  // gradual power curve
+          h += `<ellipse id="dl-${p}-${b}-${s + 1}" class="ltrl" rx="${r}" ry="${r}" fill-opacity="${op}" fill="${col}" style="offset-path:${path};animation-duration:3.5s;"/>\n  `;
+        }
+        h += `</g>\n  `;
+      }
+      return h;
+    };
+    let html = '';
+    html += mkSegs('sol', `path('')`,            '#ffd60a');
+    html += mkSegs('grd', `path('${toGrid}')`,   '#32D74B');
+    html += mkSegs('imp', `path('${fromGrid}')`, '#0084FF');
+    html += mkSegs('hse', `path('${toHouse}')`,  '#ff9500');
+    if (hasBat) {
+      html += mkSegs('bat', `path('${fromBat}')`, '#30D158');
+      html += mkSegs('chg', `path('${toBat}')`,   '#30D158');
+    }
+    return html;
+  })()}
+
   <!-- PARTICLES — translateY shifts perpendicular to path (offset-rotate:auto local space) -->
   <!-- sol: 8 particles, ±5px / ±8px lateral offset -->
   <ellipse id="dp-sol-1" class="oval prt" rx="1.5" ry="1.5" fill="#ffd60a" style="offset-path:path('');animation-duration:3.5s;animation-delay:0.53s;transform:translateY(5px)"/>
@@ -921,6 +999,7 @@ class SolarArcCard extends HTMLElement {
         sr.querySelector('#p-solar').setAttribute('d', moonPath);
         sr.querySelector('#p-solar').style.stroke = solStroke;
         solIds.forEach(id => { const e = sr.querySelector(id); if (e) { e.style.offsetPath = `path('${moonPath}')`; e.setAttribute('fill', solColor); } });
+        for (let b = 0; b < 2; b++) { const h = sr.querySelector(`#dl-sol-${b}-0`); if (h) h.style.offsetPath = `path('${moonPath}')`; const c = sr.querySelector(`#dl-sol-${b}-core`); if (c) c.style.offsetPath = `path('${moonPath}')`; for (let s = 1; s <= 56; s++) { const e = sr.querySelector(`#dl-sol-${b}-${s}`); if (e) e.style.offsetPath = `path('${moonPath}')`; } }
         this._setParticles(sr, 'sol', solColor, true, this._dur(pv, PL.sol), moonPath, PL.sol);
         // Pill u měsíce
         const pillX = mp[0] + 94 > 390 ? mp[0] - 94 : mp[0] + 14;
@@ -967,6 +1046,7 @@ class SolarArcCard extends HTMLElement {
       sr.querySelector('#p-solar').setAttribute('d', solarPath);
       sr.querySelector('#p-solar').style.stroke = isProd ? solStroke : 'transparent';
       solIds.forEach(id => { const e = sr.querySelector(id); if (e) { e.style.offsetPath = `path('${solarPath}')`; e.setAttribute('fill', solColor); } });
+      for (let b = 0; b < 2; b++) { const h = sr.querySelector(`#dl-sol-${b}-0`); if (h) h.style.offsetPath = `path('${solarPath}')`; const c = sr.querySelector(`#dl-sol-${b}-core`); if (c) c.style.offsetPath = `path('${solarPath}')`; for (let s = 1; s <= 56; s++) { const e = sr.querySelector(`#dl-sol-${b}-${s}`); if (e) e.style.offsetPath = `path('${solarPath}')`; } }
       this._setParticles(sr, 'sol', solColor, isProd, this._dur(pv, PL.sol), solarPath, PL.sol);
     }
 
@@ -988,10 +1068,10 @@ class SolarArcCard extends HTMLElement {
     const impColor = cfg.arc_grid_color || '#0084FF';
     const hseColor = cfg.arc_home_color || '#FF9500';
 
-    this._setFlow(sr, ['#d-sol-1','#d-sol-2','#d-sol-3','#d-sol-4'], isProd,     this._dur(pv,    PL.sol), PL.sol);
-    this._setFlow(sr, ['#d-grd-1','#d-grd-2','#d-grd-3','#d-grd-4'], isExport,   this._dur(grid,  PL.grd), PL.grd);
-    this._setFlow(sr, ['#d-imp-1','#d-imp-2','#d-imp-3','#d-imp-4'], isImport,   this._dur(grid,  PL.imp), PL.imp);
-    this._setFlow(sr, ['#d-hse-1','#d-hse-2','#d-hse-3','#d-hse-4'], house > 20, this._dur(house, PL.hse), PL.hse);
+    this._setFlow(sr, ['#d-sol-1','#d-sol-2','#d-sol-3','#d-sol-4'], isProd,     this._dur(pv,    PL.sol), PL.sol, solColor);
+    this._setFlow(sr, ['#d-grd-1','#d-grd-2','#d-grd-3','#d-grd-4'], isExport,   this._dur(grid,  PL.grd), PL.grd, grdColor);
+    this._setFlow(sr, ['#d-imp-1','#d-imp-2','#d-imp-3','#d-imp-4'], isImport,   this._dur(grid,  PL.imp), PL.imp, impColor);
+    this._setFlow(sr, ['#d-hse-1','#d-hse-2','#d-hse-3','#d-hse-4'], house > 20, this._dur(house, PL.hse), PL.hse, hseColor);
 
     // Hlavy oválků — barva se jinak nemění po _buildDOM, musíme je aktualizovat
     if (cfg.arc_grid_color) {
@@ -1091,8 +1171,8 @@ class SolarArcCard extends HTMLElement {
       // Oval flow
       if (cfg.arc_battery_discharge_color) this._setOvalColor(sr, 'bat', batDisColor);
       if (cfg.arc_battery_charge_color)    this._setOvalColor(sr, 'chg', batChgColor);
-      this._setFlow(sr, ['#d-bat-1','#d-bat-2','#d-bat-3','#d-bat-4'], isDischarging, this._dur(bat,            PL.bat), PL.bat);
-      this._setFlow(sr, ['#d-chg-1','#d-chg-2','#d-chg-3','#d-chg-4'], isCharging,    this._dur(Math.abs(bat), PL.chg), PL.chg);
+      this._setFlow(sr, ['#d-bat-1','#d-bat-2','#d-bat-3','#d-bat-4'], isDischarging, this._dur(bat,           PL.bat), PL.bat, batDisColor);
+      this._setFlow(sr, ['#d-chg-1','#d-chg-2','#d-chg-3','#d-chg-4'], isCharging,   this._dur(Math.abs(bat), PL.chg), PL.chg, batChgColor);
       this._setParticles(sr, 'bat', batDisColor, isDischarging, this._dur(bat,              PL.bat), undefined, PL.bat);
       this._setParticles(sr, 'chg', batChgColor, isCharging,    this._dur(Math.abs(bat),   PL.chg), undefined, PL.chg);
 
@@ -1762,41 +1842,111 @@ class SolarArcCard extends HTMLElement {
     }
   }
 
-  _setFlow(sr, ids, visible, dur, pathLen = 220) {
-    // Oval count: more on longer/slower paths, fewer on shorter/faster ones
-    const maxN = (pathLen >= 200 && dur >= 1.0)
-      ? (this._config?.arc_flow_ovals_slow ?? 4)
-      : (this._config?.arc_flow_ovals_fast ?? 2);
-    const n    = Math.min(ids.length, maxN);
-    const d    = dur.toFixed(2);
-    const gOff = [dur * 0.025, dur * 0.05, dur * 0.075];
-    ids.forEach((sel, i) => {
-      const show = visible && i < n;
-      const base = -(dur * i / n);   // evenly spaced: 0, -T/n, -2T/n, -3T/n
-      const el = sr.querySelector(sel);
-      if (el) {
-        el.style.visibility        = show ? 'visible' : 'hidden';
-        el.style.animationDuration = `${d}s`;
-        el.style.animationDelay    = `${base.toFixed(2)}s`;
-      }
-      gOff.forEach((off, gi) => {
-        const g = sr.querySelector(`${sel}g${gi + 1}`);
-        if (g) {
-          g.style.visibility        = show ? 'visible' : 'hidden';
-          g.style.animationDuration = `${d}s`;
-          g.style.animationDelay    = `${(base + off).toFixed(2)}s`;
-        }
+  _setFlow(sr, ids, visible, dur, pathLen = 220, color = null) {
+    const style = this._config?.arc_flow_style || 'oval';
+    const cfg   = this._config;
+
+    if (style === 'laser') {
+      // ── Hide all oval elements ──────────────────────────────────────────
+      ids.forEach(sel => {
+        [sel, `${sel}g1`, `${sel}g2`, `${sel}g3`].forEach(s => {
+          const e = sr.querySelector(s); if (e) e.style.visibility = 'hidden';
+        });
       });
-    });
+      // ── Extract prefix: '#d-sol-1' → 'sol' ─────────────────────────────
+      const prefix = ids[0].replace(/^#d-/, '').replace(/-\d+$/, '');
+      // ── Beam count from config ──────────────────────────────────────────
+      const maxBeams = (pathLen >= 200 && dur >= 1.0)
+        ? (cfg?.arc_flow_count_slow ?? 1)
+        : (cfg?.arc_flow_count_fast ?? 1);
+      const numBeams = Math.min(maxBeams, 2);
+      // ── 350px tail: convert to time fraction ───────────────────────────
+      const N_TAIL  = 56;                          // circles per beam
+      const tailDur = Math.min(350 * dur / pathLen, dur * 0.84); // cap: tail ≤ 84% of cycle so circles never wrap
+      const segStep = tailDur / N_TAIL;           // per-segment offset (56 gaps head→tail tip)
+      const d = dur.toFixed(2);
+      for (let b = 0; b < 2; b++) {
+        const beamVis  = visible && b < numBeams;
+        const beamBase = -(tailDur + dur * b / numBeams);
+        // Head (seg 0) — individual element
+        const head = sr.querySelector(`#dl-${prefix}-${b}-0`);
+        if (head) {
+          head.style.visibility        = beamVis ? 'visible' : 'hidden';
+          head.style.animationDuration = `${d}s`;
+          head.style.animationDelay    = `${beamBase.toFixed(3)}s`;   // most negative = furthest ahead
+          if (color) head.setAttribute('fill', color);
+        }
+        // White hot core — same timing as head, always white
+        const core = sr.querySelector(`#dl-${prefix}-${b}-core`);
+        if (core) {
+          core.style.visibility        = beamVis ? 'visible' : 'hidden';
+          core.style.animationDuration = `${d}s`;
+          core.style.animationDelay    = `${beamBase.toFixed(3)}s`;
+        }
+        // Trail group — one visibility toggle for all circles
+        const grp = sr.querySelector(`#dl-trail-${prefix}-${b}`);
+        if (grp) grp.style.visibility = beamVis ? 'visible' : 'hidden';
+        // Update circle delays + color inside group
+        for (let s = 1; s <= N_TAIL; s++) {
+          const el = sr.querySelector(`#dl-${prefix}-${b}-${s}`);
+          if (!el) continue;
+          el.style.animationDuration = `${d}s`;
+          el.style.animationDelay    = `${(beamBase + segStep * s).toFixed(3)}s`;
+          if (color) el.setAttribute('fill', color);
+        }
+      }
+
+    } else {
+      // ── OVAL (default) ──────────────────────────────────────────────────
+      // Hide laser segments for this prefix (group + head)
+      const prefix = ids[0].replace(/^#d-/, '').replace(/-\d+$/, '');
+      for (let b = 0; b < 2; b++) {
+        const h = sr.querySelector(`#dl-${prefix}-${b}-0`);
+        if (h) h.style.visibility = 'hidden';
+        const g = sr.querySelector(`#dl-trail-${prefix}-${b}`);
+        if (g) g.style.visibility = 'hidden';
+      }
+      const maxN = (pathLen >= 200 && dur >= 1.0)
+        ? (cfg?.arc_flow_count_slow ?? 4)
+        : (cfg?.arc_flow_count_fast ?? 2);
+      const n    = Math.min(ids.length, maxN);
+      const d    = dur.toFixed(2);
+      const gOff = [dur * 0.025, dur * 0.05, dur * 0.075];
+      ids.forEach((sel, i) => {
+        const show = visible && i < n;
+        const base = -(dur * i / n);
+        const el = sr.querySelector(sel);
+        if (el) {
+          el.style.visibility        = show ? 'visible' : 'hidden';
+          el.style.animationDuration = `${d}s`;
+          el.style.animationDelay    = `${base.toFixed(2)}s`;
+        }
+        gOff.forEach((off, gi) => {
+          const g = sr.querySelector(`${sel}g${gi + 1}`);
+          if (g) {
+            g.style.visibility        = show ? 'visible' : 'hidden';
+            g.style.animationDuration = `${d}s`;
+            g.style.animationDelay    = `${(base + off).toFixed(2)}s`;
+          }
+        });
+      });
+    }
   }
 
   _setParticles(sr, prefix, color, visible, dur, path, pathLen = 220) {
-    // Number of visible particles scales with path length for consistent visual density
+    // Laser style uses its own glow — particles hidden
+    if ((this._config?.arc_flow_style || 'oval') === 'laser') {
+      for (let n = 1; n <= 8; n++) {
+        const el = sr.querySelector(`#dp-${prefix}-${n}`);
+        if (el) el.style.visibility = 'hidden';
+      }
+      return;
+    }
     const np = pathLen >= 320 ? 8 : pathLen >= 250 ? 6 : pathLen >= 180 ? 4 : 2;
     // phases evenly distributed: 0.15, 0.65, 0.35, 0.85, 0.55, 0.05, 0.75, 0.25
     const configs = [
-      { n: 1, vis: visible,              del: dur *  0.15 },
-      { n: 2, vis: visible,              del: dur * -0.35 },
+      { n: 1, vis: visible && np >= 1,   del: dur *  0.15 },
+      { n: 2, vis: visible && np >= 2,   del: dur * -0.35 },
       { n: 3, vis: visible && np >= 4,   del: dur *  0.35 },
       { n: 4, vis: visible && np >= 4,   del: dur * -0.15 },
       { n: 5, vis: visible && np >= 6,   del: dur *  0.55 },
@@ -1859,10 +2009,386 @@ class SolarArcCard extends HTMLElement {
       const e = sr.querySelector(`#dp-sol-${n}`);
       if (e) e.style.offsetPath = `path('${solarPath}')`;
     }
+    // Update laser segment paths for solar (path changes each minute with sun position)
+    for (let b = 0; b < 2; b++) {
+      for (let s = 0; s <= 56; s++) {
+        const e = sr.querySelector(`#dl-sol-${b}-${s}`);
+        if (e) e.style.offsetPath = `path('${solarPath}')`;
+      }
+      const c = sr.querySelector(`#dl-sol-${b}-core`);
+      if (c) c.style.offsetPath = `path('${solarPath}')`;
+    }
   }
 }
 
 customElements.define('solar-arc-card', SolarArcCard);
+
+// ══════════════════════════════════════════════════════════════════════════════
+// EDITOR
+// ══════════════════════════════════════════════════════════════════════════════
+
+const _EDITOR_COLORS = [
+  { label: 'Default', value: '' },
+  { label: 'Blue',   value: '#007AFF' },
+  { label: 'Green',  value: '#32D74B' },
+  { label: 'Yellow', value: '#FFD60A' },
+  { label: 'Orange', value: '#FF9500' },
+  { label: 'Red',    value: '#FF3B30' },
+  { label: 'Teal',   value: '#5AC8FA' },
+  { label: 'Purple', value: '#BF5AF2' },
+  { label: 'Pink',   value: '#FF2D55' },
+  { label: 'White',  value: '#FFFFFF' },
+];
+
+class SolarArcCardEditor extends HTMLElement {
+  constructor() {
+    super();
+    // Light DOM — no shadow DOM
+    this._config   = {};
+    this._built    = false;
+    this._tab      = 'arc';
+    this._sections = null;
+  }
+
+  // ── HA hooks ──────────────────────────────────────────────────────────────
+  set hass(_h) { /* not needed — using ha-textfield for entities */ }
+
+  setConfig(config) {
+    this._config   = config ?? {};
+    this._sections = config?.sankey?.sections ?? config?.sections ?? null;
+    if (!this._built) { this._render(); this._built = true; }
+    this._syncValues();
+  }
+
+  // ── Config helpers ────────────────────────────────────────────────────────
+  _update(value, ...path) {
+    const deep = o => JSON.parse(JSON.stringify(o ?? {}));
+    const c = deep(this._config);
+    let v = c;
+    for (let i = 0; i < path.length - 1; i++) {
+      if (v[path[i]] == null) v[path[i]] = {};
+      v = v[path[i]];
+    }
+    v[path[path.length - 1]] = value;
+    this._config = c;
+    this.dispatchEvent(new CustomEvent('config-changed', {
+      detail: { config: c }, bubbles: true, composed: true,
+    }));
+  }
+
+  // ── Select helpers ────────────────────────────────────────────────────────
+  _colorOpts(current = '') {
+    const rows = _EDITOR_COLORS.map(({ label, value }) => {
+      const sel = value === current ? ' selected' : '';
+      const hex = value ? ` (${value})` : '';
+      return `<option value="${value}"${sel}>${label}${hex}</option>`;
+    }).join('');
+    // If current is a custom hex not in the palette, add a visible placeholder option
+    const inPalette = !current || _EDITOR_COLORS.some(c => c.value === current);
+    const custom    = inPalette ? '' : `<option value="${current}" selected>Custom (${current})</option>`;
+    return rows + custom;
+  }
+
+  _sel(id, label, opts) {
+    return `<div class="sac-field">
+      <label class="sac-lbl">${label}</label>
+      <select id="${id}" class="sac-sel">${opts}</select>
+    </div>`;
+  }
+
+  // Color row: predefined select + native color picker side by side
+  _colorRow(id, label, current = '') {
+    const cpVal = current || '#aaaaaa';
+    const cpOpa = current ? '1' : '0.3';
+    return `<div class="sac-field">
+      <label class="sac-lbl">${label}</label>
+      <div class="sac-crow">
+        <select id="${id}" class="sac-sel">${this._colorOpts(current)}</select>
+        <input type="color" id="${id}-cp" class="sac-cp" value="${cpVal}" style="opacity:${cpOpa}" title="Pick custom color">
+      </div>
+    </div>`;
+  }
+
+  // ── One-time DOM build ────────────────────────────────────────────────────
+  _render() {
+    const co = this._colorOpts();
+
+    const arc = this._config?.arc    || {};
+    const as  = arc.style            || {};
+    const sk  = this._config?.sankey || {};
+    const ss  = sk.style             || {};
+    const cs  = (id, lbl, cur) => this._colorRow(id, lbl, cur || '');
+
+    this.innerHTML = `
+    <style>
+      .sac-ed .tabs { display: flex; border-bottom: 1px solid var(--divider-color); margin-bottom: 12px; }
+      .sac-ed .tab  { flex: 1; padding: 10px 4px; background: none; border: none;
+                      border-bottom: 2px solid transparent; cursor: pointer;
+                      font: 500 13px/1 var(--paper-font-body1_-_font-family, sans-serif);
+                      color: var(--secondary-text-color); transition: color .15s, border-color .15s; }
+      .sac-ed .tab.active { color: var(--primary-color); border-bottom-color: var(--primary-color); }
+      .sac-ed .pane { display: none; }
+      .sac-ed .pane.active { display: block; }
+      .sac-ed .sec  { font: 600 11px/1 var(--paper-font-body1_-_font-family, sans-serif);
+                      text-transform: uppercase; letter-spacing: .6px;
+                      color: var(--secondary-text-color); margin: 16px 0 8px; }
+      .sac-ed ha-textfield,
+      .sac-ed ha-icon-picker { display: block; margin-bottom: 8px; }
+      .sac-ed ha-formfield   { display: flex; align-items: center; justify-content: space-between;
+                               padding: 4px 0; margin-bottom: 2px; }
+      .sac-ed .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+      .sac-ed .sac-field { margin-bottom: 10px; }
+      .sac-ed .sac-lbl  { display: block; font-size: 12px; color: var(--secondary-text-color);
+                          margin-bottom: 3px; }
+      .sac-ed .sac-sel  { width: 100%; padding: 8px 10px; box-sizing: border-box;
+                          background: var(--input-fill-color, var(--secondary-background-color));
+                          color: var(--primary-text-color);
+                          border: 1px solid var(--input-ink-color, var(--divider-color));
+                          border-radius: 4px; font-size: 14px; cursor: pointer; }
+      .sac-ed .sac-sel:focus { outline: none; border-color: var(--primary-color); }
+      .sac-ed .sac-crow { display: flex; gap: 6px; align-items: center; }
+      .sac-ed .sac-crow .sac-sel { flex: 1; }
+      .sac-ed .sac-cp   { width: 36px; height: 34px; padding: 2px; flex-shrink: 0;
+                          box-sizing: border-box; border: 1px solid var(--divider-color);
+                          border-radius: 4px; cursor: pointer; background: none; }
+      .sac-ed .yaml-note { font-size: 12px; color: var(--secondary-text-color);
+                           margin: 4px 0 8px; line-height: 1.5; }
+      .sac-ed .yaml-note a { color: var(--primary-color); }
+      .sac-ed ha-yaml-editor { display: block; margin-top: 4px; }
+    </style>
+
+    <div class="sac-ed">
+      <div class="tabs">
+        <button class="tab active" data-tab="arc">Arc</button>
+        <button class="tab"        data-tab="sankey">Sankey</button>
+      </div>
+
+      <!-- ═══ ARC TAB ═══ -->
+      <div class="pane active" id="pane-arc">
+
+        <p class="sec">Entities</p>
+        <ha-textfield id="tf-sol" label="Solar / PV production *"  helper="e.g. sensor.pv_power"            helper-persistent value="${arc.solar_production  || ''}"></ha-textfield>
+        <ha-textfield id="tf-hse" label="House consumption *"      helper="e.g. sensor.house_consumption"   helper-persistent value="${arc.house_consumption || ''}"></ha-textfield>
+        <ha-textfield id="tf-grd" label="Grid power *"             helper="positive = export, negative = import" helper-persistent value="${arc.grid_power || ''}"></ha-textfield>
+        <ha-textfield id="tf-bat" label="Battery power (optional)" helper="positive = discharging, negative = charging" helper-persistent value="${arc.battery_power || ''}"></ha-textfield>
+
+        <p class="sec">Display</p>
+        <ha-formfield label="Show arc section"><ha-switch id="sw-arc"></ha-switch></ha-formfield>
+        <ha-formfield label="Show title bar">  <ha-switch id="sw-ttl"></ha-switch></ha-formfield>
+        <ha-formfield label="Show title icon"> <ha-switch id="sw-ico"></ha-switch></ha-formfield>
+        <ha-textfield   id="tf-ttl"  label="Title text"></ha-textfield>
+        <ha-icon-picker id="ip-ttl"  label="Title icon"></ha-icon-picker>
+
+        <p class="sec">Flow</p>
+        ${this._sel('sel-flow', 'Flow style',
+            `<option value="oval"  ${(arc.flow_style||'oval')==='oval'  ? 'selected':''}>Oval</option>
+             <option value="laser" ${(arc.flow_style||'')==='laser' ? 'selected':''}>Laser beam</option>`)}
+        <div class="row2">
+          <ha-textfield id="tf-slow" label="Count (slow)" type="number" min="1" max="4"></ha-textfield>
+          <ha-textfield id="tf-fast" label="Count (fast)" type="number" min="1" max="4"></ha-textfield>
+        </div>
+
+        <p class="sec">Colors</p>
+        ${cs('col-grd', 'Grid',               as.arc_grid_color)}
+        ${cs('col-hse', 'Home',               as.arc_home_color)}
+        ${cs('col-sol', 'Solar flow (day)',   as.arc_sun_flow_color)}
+        ${cs('col-moo', 'Solar flow (night)', as.arc_moon_flow_color)}
+        ${cs('col-inv', 'Inverter node',      as.arc_inverter_color)}
+        ${cs('col-ina', 'Inactive nodes',     as.arc_inactive_color)}
+        ${cs('col-ico', 'Node icons',         as.arc_icon_color)}
+        ${cs('col-txt', 'Text',               as.arc_text_color)}
+        ${cs('col-ttc', 'Title text color',   as.arc_title_text_color)}
+        ${cs('col-tic', 'Title icon color',   as.arc_title_icon_color)}
+        ${cs('col-bdc', 'Battery discharge',  as.arc_battery_discharge_color)}
+        ${cs('col-bcc', 'Battery charge',     as.arc_battery_charge_color)}
+      </div>
+
+      <!-- ═══ SANKEY TAB ═══ -->
+      <div class="pane" id="pane-sankey">
+
+        <p class="sec">Display</p>
+        <ha-formfield label="Show Sankey section"><ha-switch id="sw-sk"></ha-switch></ha-formfield>
+        <ha-formfield label="Show title bar">     <ha-switch id="sw-sk-ttl"></ha-switch></ha-formfield>
+        <ha-formfield label="Show title icon">    <ha-switch id="sw-sk-ico"></ha-switch></ha-formfield>
+        <ha-textfield   id="tf-sk-ttl"  label="Title text"></ha-textfield>
+        <ha-icon-picker id="ip-sk-ttl"  label="Title icon"></ha-icon-picker>
+        ${this._sel('sel-layout', 'Layout',
+            `<option value="horizontal" ${(sk.layout||'horizontal')==='horizontal' ? 'selected':''}>Horizontal</option>
+             <option value="vertical"   ${(sk.layout||'')==='vertical' ? 'selected':''}>Vertical</option>`)}
+
+        <p class="sec">Colors</p>
+        ${cs('col-sk-tic', 'Title icon color', ss.sankey_title_icon_color)}
+        ${cs('col-sk-ttc', 'Title text color', ss.sankey_title_text_color)}
+        ${cs('col-sk-tp',  'Node name color',  ss.sankey_text_color_primary)}
+        ${cs('col-sk-ts',  'Node value color', ss.sankey_text_color_secondary)}
+
+        <p class="sec">Sections</p>
+        <p class="yaml-note">
+          Configure energy flow columns in YAML.
+          <a href="https://github.com/martinargalas/ha-solar-arc-card#sankeysections--entity-options"
+             target="_blank">Documentation ↗</a>
+        </p>
+        <ha-yaml-editor id="sect-yaml"></ha-yaml-editor>
+      </div>
+    </div>`;
+
+    // ── Wire events ─────────────────────────────────────────────────────────
+    // Tabs
+    this.querySelectorAll('.tab').forEach(btn =>
+      btn.addEventListener('click', () => {
+        this._tab = btn.dataset.tab;
+        this.querySelectorAll('.tab') .forEach(b => b.classList.toggle('active', b.dataset.tab === this._tab));
+        this.querySelectorAll('.pane').forEach(p => p.classList.toggle('active', p.id === `pane-${this._tab}`));
+      })
+    );
+
+    // Entity text fields — change fires on blur after edit
+    const ef = (id, ...path) =>
+      this.querySelector(`#${id}`)?.addEventListener('change', e => this._update(e.target.value.trim(), ...path));
+    ef('tf-sol', 'arc', 'solar_production');
+    ef('tf-hse', 'arc', 'house_consumption');
+    ef('tf-grd', 'arc', 'grid_power');
+    ef('tf-bat', 'arc', 'battery_power');
+
+    // Switches
+    const sw = (id, ...path) =>
+      this.querySelector(`#${id}`)?.addEventListener('change', e => this._update(e.target.checked, ...path));
+    sw('sw-arc',    'arc',    'arc_show');
+    sw('sw-ttl',    'arc',    'arc_title_show');
+    sw('sw-ico',    'arc',    'arc_title_icon_show');
+    sw('sw-sk',     'sankey', 'sankey_show');
+    sw('sw-sk-ttl', 'sankey', 'sankey_title_show');
+    sw('sw-sk-ico', 'sankey', 'sankey_title_icon_show');
+
+    // Text fields
+    const tf = (id, coerce, ...path) =>
+      this.querySelector(`#${id}`)?.addEventListener('change', e => this._update(coerce(e.target.value), ...path));
+    tf('tf-ttl',    String, 'arc',    'arc_title_text');
+    tf('tf-slow',   Number, 'arc',    'flow_count_slow');
+    tf('tf-fast',   Number, 'arc',    'flow_count_fast');
+    tf('tf-sk-ttl', String, 'sankey', 'sankey_title_text');
+
+    // Icon pickers
+    const ip = (id, ...path) =>
+      this.querySelector(`#${id}`)?.addEventListener('value-changed', e => this._update(e.detail.value, ...path));
+    ip('ip-ttl',    'arc',    'style', 'arc_title_icon');
+    ip('ip-sk-ttl', 'sankey', 'style', 'sankey_title_icon');
+
+    // Non-color selects (flow style, layout)
+    const sel = (id, ...path) =>
+      this.querySelector(`#${id}`)?.addEventListener('change', e => this._update(e.target.value, ...path));
+    sel('sel-flow',   'arc',    'flow_style');
+    sel('sel-layout', 'sankey', 'layout');
+
+    // Color rows: select + color picker, keep each other in sync
+    const cr = (id, ...path) => {
+      const elSel = this.querySelector(`#${id}`);
+      const elCp  = this.querySelector(`#${id}-cp`);
+      // Select → update config + sync picker
+      elSel?.addEventListener('change', e => {
+        const val = e.target.value;
+        if (elCp) { elCp.value = val || '#aaaaaa'; elCp.style.opacity = val ? '1' : '0.3'; }
+        this._update(val, ...path);
+      });
+      // Color picker → update config + sync select (or show Custom)
+      elCp?.addEventListener('input', e => {
+        const val = e.target.value;  // always a valid #rrggbb hex
+        elCp.style.opacity = '1';
+        if (elSel) {
+          const found = _EDITOR_COLORS.find(c => c.value.toLowerCase() === val.toLowerCase());
+          if (found) {
+            elSel.value = found.value;
+          } else {
+            // Ensure a "Custom" option exists and select it
+            let custom = elSel.querySelector('option[data-custom]');
+            if (!custom) {
+              custom = document.createElement('option');
+              custom.setAttribute('data-custom', '1');
+              elSel.appendChild(custom);
+            }
+            custom.value = val;
+            custom.textContent = `Custom (${val})`;
+            elSel.value = val;
+          }
+        }
+        this._update(val, ...path);
+      });
+    };
+    cr('col-grd', 'arc', 'style', 'arc_grid_color');
+    cr('col-hse', 'arc', 'style', 'arc_home_color');
+    cr('col-sol', 'arc', 'style', 'arc_sun_flow_color');
+    cr('col-moo', 'arc', 'style', 'arc_moon_flow_color');
+    cr('col-inv', 'arc', 'style', 'arc_inverter_color');
+    cr('col-ina', 'arc', 'style', 'arc_inactive_color');
+    cr('col-ico', 'arc', 'style', 'arc_icon_color');
+    cr('col-txt', 'arc', 'style', 'arc_text_color');
+    cr('col-ttc', 'arc', 'style', 'arc_title_text_color');
+    cr('col-tic', 'arc', 'style', 'arc_title_icon_color');
+    cr('col-bdc', 'arc', 'style', 'arc_battery_discharge_color');
+    cr('col-bcc', 'arc', 'style', 'arc_battery_charge_color');
+    cr('col-sk-tic', 'sankey', 'style', 'sankey_title_icon_color');
+    cr('col-sk-ttc', 'sankey', 'style', 'sankey_title_text_color');
+    cr('col-sk-tp',  'sankey', 'style', 'sankey_text_color_primary');
+    cr('col-sk-ts',  'sankey', 'style', 'sankey_text_color_secondary');
+
+    // YAML sections
+    this.querySelector('#sect-yaml')?.addEventListener('value-changed', e => {
+      if (e.detail?.value !== undefined) {
+        this._sections = e.detail.value;
+        this._update(e.detail.value, 'sankey', 'sections');
+      }
+    });
+  }
+
+  // ── Sync values into controls after each setConfig ────────────────────────
+  _syncValues() {
+    const arc = this._config?.arc    || {};
+    const as  = arc.style            || {};
+    const sk  = this._config?.sankey || {};
+    const ss  = sk.style             || {};
+
+    const set = (id, v) => {
+      const el = this.querySelector(`#${id}`);
+      if (!el) return;
+      if (el.tagName === 'HA-SWITCH') el.checked = !!v;
+      else el.value = (v === undefined || v === null) ? '' : v;
+    };
+
+    requestAnimationFrame(() => {
+      // Entities
+      set('tf-sol', arc.solar_production  || '');
+      set('tf-hse', arc.house_consumption || '');
+      set('tf-grd', arc.grid_power        || '');
+      set('tf-bat', arc.battery_power     || '');
+
+      // Arc display
+      set('sw-arc', arc.arc_show !== false);
+      set('sw-ttl', arc.arc_title_show !== false);
+      set('sw-ico', arc.arc_title_icon_show !== false);
+      set('tf-ttl', arc.arc_title_text || 'Aktuální stav');
+      set('ip-ttl', as.arc_title_icon || arc.arc_title_icon || 'mdi:flash');
+
+      // Flow counts (selects baked into HTML, only textfields need sync)
+      set('tf-slow',  arc.flow_count_slow ?? 4);
+      set('tf-fast',  arc.flow_count_fast ?? 2);
+
+      // Sankey display
+      set('sw-sk',      sk.sankey_show !== false);
+      set('sw-sk-ttl',  sk.sankey_title_show !== false);
+      set('sw-sk-ico',  sk.sankey_title_icon_show !== false);
+      set('tf-sk-ttl',  sk.sankey_title_text || 'Tok energie');
+      set('ip-sk-ttl', ss.sankey_title_icon || sk.sankey_title_icon || 'mdi:lightning-bolt');
+      // sel-layout and color selects are baked into HTML with selected attr
+
+      // YAML sections
+      const ye = this.querySelector('#sect-yaml');
+      if (ye) ye.value = this._sections ?? null;
+
+    });
+  }
+}
+
+customElements.define('solar-arc-card-editor', SolarArcCardEditor);
 
 window.customCards = window.customCards || [];
 window.customCards.push({
