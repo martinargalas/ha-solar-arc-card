@@ -1,7 +1,7 @@
 # Solar Arc Card
 
 <p align="center">
-  <img src="docs/day.png" width="48%" alt="Day mode"/>
+  <img src="docs/day2.png" width="48%" alt="Day mode"/>
   &nbsp;&nbsp;
   <img src="docs/night.png" width="48%" alt="Night mode"/>
 </p>
