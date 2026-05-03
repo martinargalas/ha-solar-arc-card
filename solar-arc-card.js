@@ -1,4 +1,4 @@
-// solar-arc-card.js v4r164
+// solar-arc-card.js v4r165
 
 const MDI = {
   generator:   'M6 3C4.89 3 4 3.9 4 5V16H6V17C6 17.55 6.45 18 7 18H8C8.55 18 9 17.55 9 17V16H15V17C15 17.55 15.45 18 16 18H17C17.55 18 18 17.55 18 17V16H20V5C20 3.9 19.11 3 18 3H6M12 7V5H18V7H12M12 9H18V11H12V9M8 5V9H10L7 15V11H5L8 5M22 20V22H2V20H22Z',
@@ -2253,14 +2253,14 @@ class SolarArcCardEditor extends HTMLElement {
     ef('tf-hse', 'arc', 'house_consumption');
     ef('tf-grd', 'arc', 'grid_power');
     ef('tf-bat', 'arc', 'battery_power');
-    sw('sw-grd-inv', 'arc', 'grid_power_inverted');
 
     // Switches
     const sw = (id, ...path) =>
       this.querySelector(`#${id}`)?.addEventListener('change', e => this._update(e.target.checked, ...path));
-    sw('sw-arc',    'arc',    'arc_show');
-    sw('sw-ttl',    'arc',    'arc_title_show');
-    sw('sw-ico',    'arc',    'arc_title_icon_show');
+    sw('sw-arc',     'arc', 'arc_show');
+    sw('sw-ttl',     'arc', 'arc_title_show');
+    sw('sw-ico',     'arc', 'arc_title_icon_show');
+    sw('sw-grd-inv', 'arc', 'grid_power_inverted');
     sw('sw-sk',     'sankey', 'sankey_show');
     sw('sw-sk-ttl', 'sankey', 'sankey_title_show');
     sw('sw-sk-ico', 'sankey', 'sankey_title_icon_show');
