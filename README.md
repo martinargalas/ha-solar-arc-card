@@ -21,18 +21,14 @@ Custom Lovelace card for Home Assistant that combines two visualizations in one:
 ## Features
 
 - Sun/moon arc with real-time position based on the built-in `sun.sun` entity
-- Animated energy flow particles (solar → inverter → grid / house / battery)
+- Animated energy flow with two styles — `oval` (classic) or `laser` (glowing beam with gradient trail)
 - Inverter ring chart showing solar vs. grid-import vs. battery-discharge ratio
-- **Battery node** — optional fourth node with charge/discharge flow and ring segment
-- Day/night mode with clouds, stars, moon and pill label
-- Glassmorphism card design
-- **Two flow styles** — `oval` (classic animated ovals) or `laser` (laser beam with glowing head and gradient trail)
-- Fully configurable Sankey diagram with unlimited sections and entities
-- Sankey supports **horizontal** and **vertical** layout
-- Customizable section separators (icon, color, text)
-- Full color theming for arc nodes, flows, glows and ring
-- Each section (arc / sankey) can be independently shown or hidden
-- **Visual UI editor** — configure arc entities, display, flow and colors without writing YAML
+- Optional battery node with charge/discharge flow
+- Day/night mode with clouds, stars and moon
+- macOS-style glassmorphism design
+- Fully configurable Sankey diagram — unlimited sections, horizontal or vertical layout
+- Full color theming for nodes, flows, glows and ring
+- **Visual UI editor** — configure everything without writing YAML
 
 ---
 
@@ -178,17 +174,17 @@ sankey:
 | `arc_title_show` | boolean | `true` | Show/hide the separator bar above arc |
 | `arc_title_icon_show` | boolean | `true` | Show/hide the separator icon |
 | `arc_title_text` | string | `Current State` | Separator label text |
-| `flow_style` | string | `oval` | Flow animation style — `oval` (classic animated ovals) or `laser` (laser beam with glowing head and gradient trail) |
-| `flow_count_slow` | integer | `4` | Number of animated ovals/beams on each flow path when animation is slow (low power). Max `4`. |
-| `flow_count_fast` | integer | `2` | Number of animated ovals/beams on each flow path when animation is fast (high power). Max `4`. |
+| `flow_style` | string | `oval` | Flow animation style — `oval` or `laser` |
+| `flow_count_slow` | integer | `4` | Number of ovals/beams per flow path at low power. Max `4`. |
+| `flow_count_fast` | integer | `2` | Number of ovals/beams per flow path at high power. Max `4`. |
 
 ### `arc.style` block
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 | `arc_title_icon` | string | `mdi:flash` | MDI icon for the separator |
-| `arc_title_icon_color` | string | `""` | Separator icon color (empty = theme default) |
-| `arc_title_text_color` | string | `""` | Separator text color (empty = theme default) |
+| `arc_title_icon_color` | string | `""` | Separator icon color (empty = card default) |
+| `arc_title_text_color` | string | `""` | Separator text color (empty = card default) |
 | `arc_text_color` | string | `""` | Color for all text labels in the arc (values, times) |
 | `arc_icon_color` | string | `""` | Color for all node icons (inverter, grid, home, battery) |
 | `arc_inverter_color` | string | `""` | Background color of the inverter node |
@@ -216,8 +212,8 @@ sankey:
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 | `sankey_title_icon` | string | `mdi:lightning-bolt` | MDI icon for the separator |
-| `sankey_title_icon_color` | string | `""` | Separator icon color (empty = theme default) |
-| `sankey_title_text_color` | string | `""` | Separator text color (empty = theme default) |
+| `sankey_title_icon_color` | string | `""` | Separator icon color (empty = card default) |
+| `sankey_title_text_color` | string | `""` | Separator text color (empty = card default) |
 | `sankey_text_color_primary` | string | `""` | Color for node name labels |
 | `sankey_text_color_secondary` | string | `""` | Color for node value labels (W) |
 
@@ -233,65 +229,19 @@ sankey:
 
 ---
 
-## Battery mode
-
-When `battery_power` is provided, the arc switches to a four-node layout:
-
-```
-        [SUN ARC]
-           │ solar
-         [INV] ──── home ────► [HSE]
-        ╱      ╲ (gutter)
-  grid ╱    bat ╲
-[GRD]          [BAT]
-```
-
-**Grid flow** connects from the bottom of the GRD node, turns right and reaches the left side of INV.
-
-**Battery flow** connects from the bottom of the BAT node, runs along the bottom gutter (same as the home flow) and reaches the bottom-left of INV when discharging, or bottom-left of INV toward BAT when charging.
-
-**Inverter ring** shows three segments when battery is discharging:
-- 🟡 Solar contribution
-- 🟢 Battery discharge contribution  
-- 🔵 Grid import contribution
-
-**Sankey** (auto-generated, no `sections:` required):
-- Battery discharging → "Battery" appears as a source in the left column
-- Battery charging → "Battery" appears as a consumer in the right column
-- Battery idle → not shown in Sankey
-
----
-
 ## Visual UI editor
 
-The card includes a built-in visual editor accessible from the HA dashboard card picker (click the pencil icon on the card).
+The card includes a built-in visual editor — click the pencil icon on the card in the dashboard.
 
 ### Arc tab
-- **Entities** — entity IDs for solar production, house consumption, grid power and battery power (text fields)
-- **Display** — toggles for arc section visibility, separator bar, separator icon; separator label text
-- **Flow** — flow style (`oval` / `laser`), slow and fast beam/oval counts
-- **Colors** — all `arc.style` color options with a preset palette and a custom color picker per field
+- **Entities** — sensors for solar production, house consumption, grid and battery
+- **Display** — section visibility, separator bar, icon and label
+- **Flow** — flow style (`oval` / `laser`) and beam/oval counts
+- **Colors** — all color options with a preset palette and custom color picker
 
 ### Sankey tab
-- **Display** — toggles for sankey section visibility, separator bar, separator icon; separator label text; layout (`horizontal` / `vertical`)
-- **Sections (YAML)** — raw YAML editor for the `sections` list (entities, names, colors, children)
-
-> **Tip:** All changes in the UI editor are applied instantly — no need to save separately.
-
----
-
-## Layouts
-
-### Horizontal (default)
-Sections are arranged as columns from left to right. Nodes within each column are stacked vertically. Best for 2–4 columns.
-
-### Vertical
-Sections are arranged as rows from top to bottom. Nodes within each row are arranged horizontally with width proportional to their value. Best for detailed breakdowns with many entities per section.
-
-```yaml
-sankey:
-  layout: vertical
-```
+- **Display** — section visibility, separator bar, icon, label and layout
+- **Sections (YAML)** — YAML editor for the `sections` list
 
 ---
 
@@ -304,7 +254,7 @@ The `grid_power` sensor is expected to follow this sign convention:
 | `> 0` | Exporting to grid |
 | `< 0` | Importing from grid |
 
-If your device uses the **opposite convention** (e.g. Shelly Pro where positive = import), add `grid_power_inverted: true` to your `arc` block — the card handles the inversion internally without requiring a template sensor.
+If your device uses the **opposite convention** (e.g. Shelly Pro where positive = import), add `grid_power_inverted: true` to your `arc` block — no template sensor needed.
 
 ## Battery power convention
 
@@ -322,5 +272,5 @@ If your inverter uses the opposite convention, create a template sensor that neg
 ## Requirements
 
 - Home Assistant 2023.x or newer
-- Sensors for PV production, house consumption, and grid power
-- Battery sensor is optional — add `battery_power` to enable the four-node layout
+- Sensors for PV production, house consumption and grid power
+- Battery sensor is optional — add `battery_power` to enable battery mode
