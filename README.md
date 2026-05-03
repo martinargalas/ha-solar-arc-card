@@ -1,5 +1,7 @@
 # Solar Arc Card
 
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 <p align="center">
   <img src="docs/day3.png" width="48%" alt="Day mode"/>
   &nbsp;&nbsp;
