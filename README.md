@@ -88,6 +88,7 @@ arc:
   solar_production: sensor.pv_production_power
   house_consumption: sensor.home_consumption_power
   grid_power: sensor.grid_active_power
+  grid_power_inverted: false
   battery_power: sensor.battery_power
 
   arc_show: true
