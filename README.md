@@ -166,6 +166,7 @@ sankey:
 | `solar_production` | string | — | PV production sensor |
 | `house_consumption` | string | — | House consumption sensor |
 | `grid_power` | string | — | Grid power sensor (positive = export, negative = import) |
+| `grid_power_inverted` | boolean | `false` | Set to `true` if your sensor uses the opposite convention (positive = import, negative = export). Useful for Shelly and similar devices. |
 | `battery_power` | string | — | Battery power sensor (positive = discharging, negative = charging). Adding this enables battery mode. |
 | `arc_show` | boolean | `true` | Show/hide the entire arc section |
 | `arc_title_show` | boolean | `true` | Show/hide the separator bar above arc |
@@ -296,6 +297,8 @@ The `grid_power` sensor is expected to follow this sign convention:
 |-------|---------|
 | `> 0` | Exporting to grid |
 | `< 0` | Importing from grid |
+
+If your device uses the **opposite convention** (e.g. Shelly Pro where positive = import), add `grid_power_inverted: true` to your `arc` block — the card handles the inversion internally without requiring a template sensor.
 
 ## Battery power convention
 

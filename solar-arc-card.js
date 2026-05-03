@@ -1,4 +1,4 @@
-// solar-arc-card.js v4r163
+// solar-arc-card.js v4r164
 
 const MDI = {
   generator:   'M6 3C4.89 3 4 3.9 4 5V16H6V17C6 17.55 6.45 18 7 18H8C8.55 18 9 17.55 9 17V16H15V17C15 17.55 15.45 18 16 18H17C17.55 18 18 17.55 18 17V16H20V5C20 3.9 19.11 3 18 3H6M12 7V5H18V7H12M12 9H18V11H12V9M8 5V9H10L7 15V11H5L8 5M22 20V22H2V20H22Z',
@@ -60,6 +60,9 @@ class SolarArcCard extends HTMLElement {
       arc_flow_style:      arc.flow_style       || 'oval',   // 'oval' | 'laser'
       arc_flow_count_slow: arc.flow_count_slow  ?? arc.flow_ovals_slow ?? 4,
       arc_flow_count_fast: arc.flow_count_fast  ?? arc.flow_ovals_fast ?? 2,
+
+      // ── Grid sign convention ─────────────────────────────────────────────
+      grid_power_inverted: !!(arc.grid_power_inverted),
 
       // ── Battery ───────────────────────────────────────────────────────────
       battery_entity:               arc.battery_power || '',
@@ -943,7 +946,7 @@ class SolarArcCard extends HTMLElement {
 
     const pv    = this._val(this._config.pv_entity);
     const house = this._val(this._config.house_entity);
-    const grid  = this._val(this._config.grid_entity);
+    const grid  = this._val(this._config.grid_entity) * (this._config.grid_power_inverted ? -1 : 1);
     const hasBat       = this._config.battery_show;
     const bat          = hasBat ? this._val(this._config.battery_entity) : 0;
     const isDischarging = hasBat && bat > 10;
@@ -2170,6 +2173,7 @@ class SolarArcCardEditor extends HTMLElement {
         <ha-textfield id="tf-sol" label="Solar / PV production *"  helper="e.g. sensor.pv_power"            helper-persistent value="${arc.solar_production  || ''}"></ha-textfield>
         <ha-textfield id="tf-hse" label="House consumption *"      helper="e.g. sensor.house_consumption"   helper-persistent value="${arc.house_consumption || ''}"></ha-textfield>
         <ha-textfield id="tf-grd" label="Grid power *"             helper="positive = export, negative = import" helper-persistent value="${arc.grid_power || ''}"></ha-textfield>
+        <ha-formfield label="Invert grid sign (e.g. Shelly: positive = import)"><ha-switch id="sw-grd-inv"></ha-switch></ha-formfield>
         <ha-textfield id="tf-bat" label="Battery power (optional)" helper="positive = discharging, negative = charging" helper-persistent value="${arc.battery_power || ''}"></ha-textfield>
 
         <p class="sec">Display</p>
@@ -2249,6 +2253,7 @@ class SolarArcCardEditor extends HTMLElement {
     ef('tf-hse', 'arc', 'house_consumption');
     ef('tf-grd', 'arc', 'grid_power');
     ef('tf-bat', 'arc', 'battery_power');
+    sw('sw-grd-inv', 'arc', 'grid_power_inverted');
 
     // Switches
     const sw = (id, ...path) =>
@@ -2358,8 +2363,9 @@ class SolarArcCardEditor extends HTMLElement {
       // Entities
       set('tf-sol', arc.solar_production  || '');
       set('tf-hse', arc.house_consumption || '');
-      set('tf-grd', arc.grid_power        || '');
-      set('tf-bat', arc.battery_power     || '');
+      set('tf-grd',     arc.grid_power          || '');
+      set('sw-grd-inv', arc.grid_power_inverted || false);
+      set('tf-bat',     arc.battery_power       || '');
 
       // Arc display
       set('sw-arc', arc.arc_show !== false);
