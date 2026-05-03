@@ -1,6 +1,9 @@
 # Solar Arc Card
 
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![HACS Custom](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://github.com/martinargalas/ha-solar-arc-card)
+[![Version](https://img.shields.io/github/v/release/martinargalas/ha-solar-arc-card?label=version&color=blue)](https://github.com/martinargalas/ha-solar-arc-card/releases/latest)
+[![Home Assistant](https://img.shields.io/badge/Home%20Assistant-2023.x%2B-brightgreen.svg)](https://www.home-assistant.io/)
+[![License: MIT](https://img.shields.io/badge/license-MIT-lightgrey.svg)](LICENSE)
 
 <p align="center">
   <img src="docs/day3.png" width="48%" alt="Day mode"/>
