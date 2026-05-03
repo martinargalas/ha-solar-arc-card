@@ -5,16 +5,16 @@
 [![Home Assistant](https://img.shields.io/badge/Home%20Assistant-2023.x%2B-brightgreen.svg)](https://www.home-assistant.io/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-lightgrey.svg)](LICENSE)
 
+Custom Lovelace card for Home Assistant that combines two visualizations in one:
+
+- **Arc** — animated solar arc showing sun position across the sky, real-time PV production, grid flow, and house consumption with animated energy particles
+- **Sankey** — fully configurable energy flow diagram showing how power moves between sources and consumers
+
 <p align="center">
   <img src="docs/day3.png" width="48%" alt="Day mode"/>
   &nbsp;&nbsp;
   <img src="docs/night.png" width="48%" alt="Night mode"/>
 </p>
-
-Custom Lovelace card for Home Assistant that combines two visualizations in one:
-
-- **Arc** — animated solar arc showing sun position across the sky, real-time PV production, grid flow, and house consumption with animated energy particles
-- **Sankey** — fully configurable energy flow diagram showing how power moves between sources and consumers
 
 ---
 
