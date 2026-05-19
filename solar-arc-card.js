@@ -1,4 +1,4 @@
-// solar-arc-card.js v4r177
+// solar-arc-card.js v4r178
 
 const MDI = {
   generator:   'M6 3C4.89 3 4 3.9 4 5V16H6V17C6 17.55 6.45 18 7 18H8C8.55 18 9 17.55 9 17V16H15V17C15 17.55 15.45 18 16 18H17C17.55 18 18 17.55 18 17V16H20V5C20 3.9 19.11 3 18 3H6M12 7V5H18V7H12M12 9H18V11H12V9M8 5V9H10L7 15V11H5L8 5M22 20V22H2V20H22Z',
@@ -2147,8 +2147,8 @@ class SolarArcCardEditor extends HTMLElement {
     return `<div class="sac-field">
       <label class="sac-lbl">${label}</label>
       <div class="sac-crow">
-        <select id="${id}" class="sac-sel">${this._colorOpts(current)}</select>
-        <input type="color" id="${id}-cp" class="sac-cp" value="${cpVal}" style="opacity:${cpOpa}" title="Pick custom color">
+        <input type="color" id="${id}-cp" class="sac-cp" value="${cpVal}" style="opacity:${cpOpa}" title="Pick color">
+        <button id="${id}-rst" class="sac-rst" title="Reset to default">✕</button>
       </div>
     </div>`;
   }
@@ -2184,17 +2184,14 @@ class SolarArcCardEditor extends HTMLElement {
       .sac-ed .sac-field { margin-bottom: 10px; }
       .sac-ed .sac-lbl  { display: block; font-size: 12px; color: var(--secondary-text-color);
                           margin-bottom: 3px; }
-      .sac-ed .sac-sel  { width: 100%; padding: 8px 10px; box-sizing: border-box;
-                          background: var(--input-fill-color, var(--secondary-background-color));
-                          color: var(--primary-text-color);
-                          border: 1px solid var(--input-ink-color, var(--divider-color));
-                          border-radius: 4px; font-size: 14px; cursor: pointer; }
-      .sac-ed .sac-sel:focus { outline: none; border-color: var(--primary-color); }
       .sac-ed .sac-crow { display: flex; gap: 6px; align-items: center; }
-      .sac-ed .sac-crow .sac-sel { flex: 1; }
-      .sac-ed .sac-cp   { width: 36px; height: 34px; padding: 2px; flex-shrink: 0;
-                          box-sizing: border-box; border: 1px solid var(--divider-color);
-                          border-radius: 4px; cursor: pointer; background: none; }
+      .sac-ed .sac-cp   { flex: 1; height: 34px; padding: 2px; box-sizing: border-box;
+                          border: 1px solid var(--divider-color); border-radius: 4px;
+                          cursor: pointer; background: none; min-width: 0; }
+      .sac-ed .sac-rst  { flex-shrink: 0; background: none; border: 1px solid var(--divider-color);
+                          border-radius: 4px; color: var(--secondary-text-color); cursor: pointer;
+                          font-size: 13px; height: 34px; padding: 0 8px; line-height: 34px; }
+      .sac-ed .sac-rst:hover { color: var(--primary-text-color); border-color: var(--primary-color); }
       .sac-ed .yaml-note { font-size: 12px; color: var(--secondary-text-color);
                            margin: 4px 0 8px; line-height: 1.5; }
       .sac-ed .yaml-note a { color: var(--primary-color); }
@@ -2337,38 +2334,17 @@ class SolarArcCardEditor extends HTMLElement {
     sel('sel-flow',   'arc',    'flow_style');
     sel('sel-layout', 'sankey', 'layout');
 
-    // Color rows: select + color picker, keep each other in sync
+    // Color rows: color picker + reset button
     const cr = (id, ...path) => {
-      const elSel = this.querySelector(`#${id}`);
       const elCp  = this.querySelector(`#${id}-cp`);
-      // Select → update config + sync picker
-      elSel?.addEventListener('change', e => {
-        const val = e.target.value;
-        if (elCp) { elCp.value = val || '#aaaaaa'; elCp.style.opacity = val ? '1' : '0.3'; }
-        this._update(val, ...path);
-      });
-      // Color picker → update config + sync select (or show Custom)
+      const elRst = this.querySelector(`#${id}-rst`);
       elCp?.addEventListener('input', e => {
-        const val = e.target.value;  // always a valid #rrggbb hex
         elCp.style.opacity = '1';
-        if (elSel) {
-          const found = _EDITOR_COLORS.find(c => c.value.toLowerCase() === val.toLowerCase());
-          if (found) {
-            elSel.value = found.value;
-          } else {
-            // Ensure a "Custom" option exists and select it
-            let custom = elSel.querySelector('option[data-custom]');
-            if (!custom) {
-              custom = document.createElement('option');
-              custom.setAttribute('data-custom', '1');
-              elSel.appendChild(custom);
-            }
-            custom.value = val;
-            custom.textContent = `Custom (${val})`;
-            elSel.value = val;
-          }
-        }
-        this._update(val, ...path);
+        this._update(e.target.value, ...path);
+      });
+      elRst?.addEventListener('click', () => {
+        if (elCp) { elCp.value = '#aaaaaa'; elCp.style.opacity = '0.3'; }
+        this._update('', ...path);
       });
     };
     cr('col-grd', 'arc', 'style', 'arc_grid_color');
@@ -2436,7 +2412,29 @@ class SolarArcCardEditor extends HTMLElement {
       set('sw-sk-ico',  sk.sankey_title_icon_show !== false);
       set('tf-sk-ttl',  sk.sankey_title_text || 'Tok energie');
       set('ip-sk-ttl', ss.sankey_title_icon || sk.sankey_title_icon || 'mdi:lightning-bolt');
-      // sel-layout and color selects are baked into HTML with selected attr
+      // Color pickers
+      const sc = (id, val) => {
+        const elCp = this.querySelector(`#${id}-cp`);
+        if (!elCp) return;
+        elCp.value = val || '#aaaaaa';
+        elCp.style.opacity = val ? '1' : '0.3';
+      };
+      sc('col-grd', as.arc_grid_color);
+      sc('col-hse', as.arc_home_color);
+      sc('col-sol', as.arc_sun_flow_color);
+      sc('col-moo', as.arc_moon_flow_color);
+      sc('col-inv', as.arc_inverter_color);
+      sc('col-ina', as.arc_inactive_color);
+      sc('col-ico', as.arc_icon_color);
+      sc('col-txt', as.arc_text_color);
+      sc('col-ttc', as.arc_title_text_color);
+      sc('col-tic', as.arc_title_icon_color);
+      sc('col-bdc', as.arc_battery_discharge_color);
+      sc('col-bcc', as.arc_battery_charge_color);
+      sc('col-sk-tic', ss.sankey_title_icon_color);
+      sc('col-sk-ttc', ss.sankey_title_text_color);
+      sc('col-sk-tp',  ss.sankey_text_color_primary);
+      sc('col-sk-ts',  ss.sankey_text_color_secondary);
 
       // YAML sections
       const ye = this.querySelector('#sect-yaml');
