@@ -199,6 +199,7 @@ sankey:
 | `arc_battery_charge_color` | string | `""` | Color of battery node, glow and flow when charging |
 | `arc_path_color_elapsed` | string | `""` | Color of the elapsed part of the sun arc (portion the sun has already traveled) |
 | `arc_path_color_remaining` | string | `""` | Color of the remaining part of the sun arc (portion not yet traveled) |
+| `arc_flow_line_color` | string | `""` | Color of the flow path lines (the tracks that ovals/laser beams travel along) |
 
 ### `sankey` block
 

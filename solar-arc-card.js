@@ -1,4 +1,4 @@
-// solar-arc-card.js v4r173
+// solar-arc-card.js v4r174
 
 const MDI = {
   generator:   'M6 3C4.89 3 4 3.9 4 5V16H6V17C6 17.55 6.45 18 7 18H8C8.55 18 9 17.55 9 17V16H15V17C15 17.55 15.45 18 16 18H17C17.55 18 18 17.55 18 17V16H20V5C20 3.9 19.11 3 18 3H6M12 7V5H18V7H12M12 9H18V11H12V9M8 5V9H10L7 15V11H5L8 5M22 20V22H2V20H22Z',
@@ -57,6 +57,7 @@ class SolarArcCard extends HTMLElement {
       arc_moon_flow_color:  arcStyle.arc_moon_flow_color  || '',
       arc_path_color_elapsed:   arcStyle.arc_path_color_elapsed   || '',
       arc_path_color_remaining: arcStyle.arc_path_color_remaining || '',
+      arc_flow_line_color:      arcStyle.arc_flow_line_color      || '',
 
       // ── Flow style + count ────────────────────────────────────────────────
       arc_flow_style:      arc.flow_style       || 'oval',   // 'oval' | 'laser'
@@ -594,10 +595,10 @@ class SolarArcCard extends HTMLElement {
     stroke-dasharray="0 9999" opacity="0"/>
 
   <g transform="translate(${20.6},${63.6}) scale(0.78)" filter="url(#txt-sh)" opacity="0.85">
-    <path d="${MDI.sunriseUp}" fill="rgba(255,255,255,0.92)"/>
+    <path id="rise-icon" d="${MDI.sunriseUp}" fill="rgba(255,255,255,0.92)"/>
   </g>
   <g transform="translate(${360.6},${63.6}) scale(0.78)" filter="url(#txt-sh)" opacity="0.55">
-    <path d="${MDI.sunsetDown}" fill="rgba(255,255,255,0.92)"/>
+    <path id="set-icon" d="${MDI.sunsetDown}" fill="rgba(255,255,255,0.92)"/>
   </g>
   <text id="rise-lbl" x="30"  y="91" text-anchor="middle" class="lbl"
     font-size="10" fill="rgba(255,255,255,0.8)" filter="url(#txt-sh)"/>
@@ -979,7 +980,7 @@ class SolarArcCard extends HTMLElement {
     const solColor  = isDay
       ? (this._config.arc_sun_flow_color  || '#ffd60a')
       : (this._config.arc_moon_flow_color || '#8EACCD');
-    const solStroke = 'rgba(255,255,255,0.12)';
+    const solStroke = cfg.arc_flow_line_color || 'rgba(255,255,255,0.12)';
     const solIds = ['#d-sol-1','#d-sol-2','#d-sol-1g1','#d-sol-2g1','#d-sol-1g2','#d-sol-2g2','#d-sol-1g3','#d-sol-2g3'];
 
     const L = hasBat ? SolarArcCard.LB : SolarArcCard.L;
@@ -1095,9 +1096,10 @@ class SolarArcCard extends HTMLElement {
     this._setParticles(sr, 'imp', impColor, isImport,   this._dur(grid,  PL.imp), undefined, PL.imp);
     this._setParticles(sr, 'hse', hseColor, house > 20, this._dur(house, PL.hse), undefined, PL.hse);
 
-    sr.querySelector('#p-from-grid').style.stroke = isImport ? 'rgba(255,255,255,0.12)' : 'transparent';
-    sr.querySelector('#p-to-grid').style.stroke   = 'rgba(255,255,255,0.12)';
-    sr.querySelector('#p-to-house').style.stroke  = 'rgba(255,255,255,0.12)';
+    const flowLine = cfg.arc_flow_line_color || 'rgba(255,255,255,0.12)';
+    sr.querySelector('#p-from-grid').style.stroke = isImport ? flowLine : 'transparent';
+    sr.querySelector('#p-to-grid').style.stroke   = flowLine;
+    sr.querySelector('#p-to-house').style.stroke  = flowLine;
 
     // ── Style: node barvy a glow gradienty ───────────────────────────────────
     const inactiveColor = cfg.arc_inactive_color || null;
@@ -1190,8 +1192,8 @@ class SolarArcCard extends HTMLElement {
       // Dim paths
       const pFromBat = sr.querySelector('#p-from-bat');
       const pToBat   = sr.querySelector('#p-to-bat');
-      if (pFromBat) pFromBat.style.stroke = isDischarging ? 'rgba(255,255,255,0.12)' : 'transparent';
-      if (pToBat)   pToBat.style.stroke   = isCharging    ? 'rgba(255,255,255,0.12)' : 'transparent';
+      if (pFromBat) pFromBat.style.stroke = isDischarging ? flowLine : 'transparent';
+      if (pToBat)   pToBat.style.stroke   = isCharging    ? flowLine : 'transparent';
     }
 
     // ── Barvy textu a ikon ────────────────────────────────────────────────────
@@ -1216,6 +1218,10 @@ class SolarArcCard extends HTMLElement {
     }
     if (cfg.arc_icon_color) {
       ['#inv-icon .node-path','#grd-icon .node-path','#hse-icon .node-path'].forEach(sel => {
+        const el = sr.querySelector(sel);
+        if (el) el.setAttribute('fill', cfg.arc_icon_color);
+      });
+      ['#rise-icon','#set-icon'].forEach(sel => {
         const el = sr.querySelector(sel);
         if (el) el.setAttribute('fill', cfg.arc_icon_color);
       });
