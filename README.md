@@ -115,6 +115,8 @@ arc:
     arc_moon_flow_color: ""
     arc_battery_discharge_color: "#30D158"
     arc_battery_charge_color: "#30D158"
+    arc_path_color_from: ""
+    arc_path_color_to: ""
 
 sankey:
   sankey_show: true
@@ -195,6 +197,8 @@ sankey:
 | `arc_moon_flow_color` | string | `""` | Color of solar flow (night) |
 | `arc_battery_discharge_color` | string | `""` | Color of battery node, glow, flow and ring segment when discharging |
 | `arc_battery_charge_color` | string | `""` | Color of battery node, glow and flow when charging |
+| `arc_path_color_from` | string | `""` | Color of the sun arc progress line at the start (sunrise side) |
+| `arc_path_color_to` | string | `""` | Color of the sun arc progress line at the end (sunset side) |
 
 ### `sankey` block
 

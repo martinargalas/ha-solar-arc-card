@@ -1,4 +1,4 @@
-// solar-arc-card.js v4r169
+// solar-arc-card.js v4r170
 
 const MDI = {
   generator:   'M6 3C4.89 3 4 3.9 4 5V16H6V17C6 17.55 6.45 18 7 18H8C8.55 18 9 17.55 9 17V16H15V17C15 17.55 15.45 18 16 18H17C17.55 18 18 17.55 18 17V16H20V5C20 3.9 19.11 3 18 3H6M12 7V5H18V7H12M12 9H18V11H12V9M8 5V9H10L7 15V11H5L8 5M22 20V22H2V20H22Z',
@@ -55,6 +55,8 @@ class SolarArcCard extends HTMLElement {
       arc_home_color:       arcStyle.arc_home_color       || '',
       arc_sun_flow_color:   arcStyle.arc_sun_flow_color   || '',
       arc_moon_flow_color:  arcStyle.arc_moon_flow_color  || '',
+      arc_path_color_from:  arcStyle.arc_path_color_from  || '',
+      arc_path_color_to:    arcStyle.arc_path_color_to    || '',
 
       // ── Flow style + count ────────────────────────────────────────────────
       arc_flow_style:      arc.flow_style       || 'oval',   // 'oval' | 'laser'
@@ -453,11 +455,11 @@ class SolarArcCard extends HTMLElement {
 <svg viewBox="${viewBox}" xmlns="http://www.w3.org/2000/svg" style="display:${this._config.arc_show ? 'block' : 'none'}">
   <defs>
     <linearGradient id="ag" x1="30" y1="0" x2="370" y2="0" gradientUnits="userSpaceOnUse">
-      <stop offset="0"    stop-color="#ffffff" stop-opacity="0"/>
-      <stop offset="0.12" stop-color="#ffffff" stop-opacity="0.55"/>
-      <stop offset="0.5"  stop-color="#ffffff" stop-opacity="1.0"/>
-      <stop offset="0.88" stop-color="#ffffff" stop-opacity="0.55"/>
-      <stop offset="1"    stop-color="#ffffff" stop-opacity="0"/>
+      <stop id="ag-s0" offset="0"    stop-color="#ffffff" stop-opacity="0"/>
+      <stop id="ag-s1" offset="0.12" stop-color="#ffffff" stop-opacity="0.55"/>
+      <stop id="ag-s2" offset="0.5"  stop-color="#ffffff" stop-opacity="1.0"/>
+      <stop id="ag-s3" offset="0.88" stop-color="#ffffff" stop-opacity="0.55"/>
+      <stop id="ag-s4" offset="1"    stop-color="#ffffff" stop-opacity="0"/>
     </linearGradient>
 
     <radialGradient id="rg-org" cx="50%" cy="50%" r="50%">
@@ -1194,6 +1196,14 @@ class SolarArcCard extends HTMLElement {
       });
       const pillTxt = sr.querySelector('#sun-pill-txt');
       if (pillTxt) pillTxt.style.color = cfg.arc_text_color;
+    }
+    if (cfg.arc_path_color_from || cfg.arc_path_color_to) {
+      const from = cfg.arc_path_color_from || cfg.arc_path_color_to || '#ffffff';
+      const to   = cfg.arc_path_color_to   || cfg.arc_path_color_from || '#ffffff';
+      [[`#ag-s0`, from], [`#ag-s1`, from], [`#ag-s2`, from], [`#ag-s3`, to], [`#ag-s4`, to]].forEach(([id, col]) => {
+        const el = sr.querySelector(id);
+        if (el) el.setAttribute('stop-color', col);
+      });
     }
     if (cfg.arc_icon_color) {
       ['#inv-icon .node-path','#grd-icon .node-path','#hse-icon .node-path'].forEach(sel => {
