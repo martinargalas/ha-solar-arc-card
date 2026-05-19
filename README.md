@@ -27,7 +27,7 @@ Custom Lovelace card for Home Assistant that combines two visualizations in one:
 - Day/night mode with clouds, stars and moon
 - macOS-style glassmorphism design
 - Fully configurable Sankey diagram — unlimited sections, horizontal or vertical layout
-- Full color theming for nodes, flows, glows and ring
+- Full color theming for nodes, flows, glows and ring — no card_mod needed
 - **Visual UI editor** — configure everything without writing YAML
 
 ---
@@ -56,6 +56,8 @@ Custom Lovelace card for Home Assistant that combines two visualizations in one:
 ---
 
 ## Configuration
+
+> **Tip:** The card has a built-in visual editor. Click the pencil icon on the card in the dashboard to configure everything without writing YAML. The examples below are for reference or advanced use.
 
 ### Minimal
 
@@ -89,51 +91,27 @@ arc:
   solar_production: sensor.pv_production_power
   house_consumption: sensor.home_consumption_power
   grid_power: sensor.grid_active_power
-  grid_power_inverted: false
   battery_power: sensor.battery_power
 
-  arc_show: true
-  arc_title_show: true
-  arc_title_icon_show: true
-  arc_title_text: "Current State"
+  # grid_power_inverted: true   # uncomment if your device reports positive = import (e.g. Shelly)
 
-  flow_style: oval
+  flow_style: laser             # oval (default) or laser
   flow_count_slow: 4
   flow_count_fast: 2
 
   style:
-    arc_title_icon: mdi:flash
     arc_title_icon_color: "#FFD60A"
-    arc_title_text_color: ""
-    arc_text_color: ""
-    arc_icon_color: ""
-    arc_inverter_color: ""
-    arc_grid_color: ""
-    arc_home_color: ""
-    arc_inactive_color: ""
-    arc_sun_flow_color: ""
-    arc_moon_flow_color: ""
     arc_battery_discharge_color: "#30D158"
     arc_battery_charge_color: "#30D158"
-    arc_path_color_elapsed: ""
-    arc_path_color_remaining: ""
-    arc_flow_line_color: ""
-    arc_pill_bg_color: ""
-    arc_pill_text_color: ""
+    arc_path_color_elapsed: "#FFD60A"
+    arc_path_color_remaining: "rgba(255,255,255,0.15)"
+    arc_flow_line_color: "rgba(255,255,255,0.12)"
 
 sankey:
-  sankey_show: true
   layout: horizontal
-  sankey_title_show: true
-  sankey_title_icon_show: true
-  sankey_title_text: "Energy Flow"
 
   style:
     sankey_title_icon: mdi:lightning-bolt
-    sankey_title_icon_color: ""
-    sankey_title_text_color: ""
-    sankey_text_color_primary: ""
-    sankey_text_color_secondary: ""
 
   sections:
     - entities:
@@ -185,24 +163,48 @@ sankey:
 
 ### `arc.style` block
 
+All color options accept hex (`#RRGGBB`) or `rgba(r,g,b,a)`. Empty string = card default.
+
+**Separator**
+
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 | `arc_title_icon` | string | `mdi:flash` | MDI icon for the separator |
-| `arc_title_icon_color` | string | `""` | Separator icon color (empty = card default) |
-| `arc_title_text_color` | string | `""` | Separator text color (empty = card default) |
-| `arc_text_color` | string | `""` | Color for all text labels in the arc (values, times) |
-| `arc_icon_color` | string | `""` | Color for all node icons (inverter, grid, home, battery) |
+| `arc_title_icon_color` | string | `""` | Separator icon color |
+| `arc_title_text_color` | string | `""` | Separator text color |
+
+**Nodes**
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
 | `arc_inverter_color` | string | `""` | Background color of the inverter node |
 | `arc_grid_color` | string | `""` | Color of the grid node, glow, flow and ring |
 | `arc_home_color` | string | `""` | Color of the home node, glow and flow |
-| `arc_inactive_color` | string | `""` | Background color of inactive nodes |
-| `arc_sun_flow_color` | string | `""` | Color of solar flow (day) |
-| `arc_moon_flow_color` | string | `""` | Color of solar flow (night) |
 | `arc_battery_discharge_color` | string | `""` | Color of battery node, glow, flow and ring segment when discharging |
 | `arc_battery_charge_color` | string | `""` | Color of battery node, glow and flow when charging |
+| `arc_inactive_color` | string | `""` | Background color of inactive nodes |
+
+**Text & icons**
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `arc_text_color` | string | `""` | Color for all text labels in the arc (values, times) |
+| `arc_icon_color` | string | `""` | Color for all node icons (inverter, grid, home, battery, sunrise, sunset) |
+
+**Flow & paths**
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `arc_sun_flow_color` | string | `""` | Color of solar flow (day) |
+| `arc_moon_flow_color` | string | `""` | Color of solar flow (night) |
+| `arc_flow_line_color` | string | `""` | Color of the flow path lines (the tracks that ovals/laser beams travel along). Supports `rgba()`. |
 | `arc_path_color_elapsed` | string | `""` | Color of the elapsed part of the sun arc (portion the sun has already traveled) |
 | `arc_path_color_remaining` | string | `""` | Color of the remaining part of the sun arc (portion not yet traveled) |
-| `arc_flow_line_color` | string | `""` | Color of the flow path lines (the tracks that ovals/laser beams travel along). Supports `rgba()`. |
+
+**Production pill**
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
 | `arc_pill_bg_color` | string | `""` | Background color of the production pill (the label near the sun/moon) |
 | `arc_pill_text_color` | string | `""` | Text color of the production pill |
 
@@ -222,8 +224,8 @@ sankey:
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 | `sankey_title_icon` | string | `mdi:lightning-bolt` | MDI icon for the separator |
-| `sankey_title_icon_color` | string | `""` | Separator icon color (empty = card default) |
-| `sankey_title_text_color` | string | `""` | Separator text color (empty = card default) |
+| `sankey_title_icon_color` | string | `""` | Separator icon color |
+| `sankey_title_text_color` | string | `""` | Separator text color |
 | `sankey_text_color_primary` | string | `""` | Color for node name labels |
 | `sankey_text_color_secondary` | string | `""` | Color for node value labels (W) |
 
@@ -247,7 +249,7 @@ The card includes a built-in visual editor — click the pencil icon on the card
 - **Entities** — sensors for solar production, house consumption, grid and battery
 - **Display** — section visibility, separator bar, icon and label
 - **Flow** — flow style (`oval` / `laser`) and beam/oval counts
-- **Colors** — all color options with a preset palette and custom color picker
+- **Colors** — all color options with a custom color picker
 
 ### Sankey tab
 - **Display** — section visibility, separator bar, icon, label and layout
