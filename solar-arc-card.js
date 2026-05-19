@@ -1,4 +1,4 @@
-// solar-arc-card.js v4r174
+// solar-arc-card.js v4r175
 
 const MDI = {
   generator:   'M6 3C4.89 3 4 3.9 4 5V16H6V17C6 17.55 6.45 18 7 18H8C8.55 18 9 17.55 9 17V16H15V17C15 17.55 15.45 18 16 18H17C17.55 18 18 17.55 18 17V16H20V5C20 3.9 19.11 3 18 3H6M12 7V5H18V7H12M12 9H18V11H12V9M8 5V9H10L7 15V11H5L8 5M22 20V22H2V20H22Z',
@@ -980,7 +980,7 @@ class SolarArcCard extends HTMLElement {
     const solColor  = isDay
       ? (this._config.arc_sun_flow_color  || '#ffd60a')
       : (this._config.arc_moon_flow_color || '#8EACCD');
-    const solStroke = cfg.arc_flow_line_color || 'rgba(255,255,255,0.12)';
+    const solStroke = this._config.arc_flow_line_color || 'rgba(255,255,255,0.12)';
     const solIds = ['#d-sol-1','#d-sol-2','#d-sol-1g1','#d-sol-2g1','#d-sol-1g2','#d-sol-2g2','#d-sol-1g3','#d-sol-2g3'];
 
     const L = hasBat ? SolarArcCard.LB : SolarArcCard.L;
