@@ -1,4 +1,4 @@
-// solar-arc-card.js v4r176
+// solar-arc-card.js v4r177
 
 const MDI = {
   generator:   'M6 3C4.89 3 4 3.9 4 5V16H6V17C6 17.55 6.45 18 7 18H8C8.55 18 9 17.55 9 17V16H15V17C15 17.55 15.45 18 16 18H17C17.55 18 18 17.55 18 17V16H20V5C20 3.9 19.11 3 18 3H6M12 7V5H18V7H12M12 9H18V11H12V9M8 5V9H10L7 15V11H5L8 5M22 20V22H2V20H22Z',
@@ -58,6 +58,8 @@ class SolarArcCard extends HTMLElement {
       arc_path_color_elapsed:   arcStyle.arc_path_color_elapsed   || '',
       arc_path_color_remaining: arcStyle.arc_path_color_remaining || '',
       arc_flow_line_color:      arcStyle.arc_flow_line_color      || '',
+      arc_pill_bg_color:        arcStyle.arc_pill_bg_color        || '',
+      arc_pill_text_color:      arcStyle.arc_pill_text_color      || '',
 
       // ── Flow style + count ────────────────────────────────────────────────
       arc_flow_style:      arc.flow_style       || 'oval',   // 'oval' | 'laser'
@@ -903,7 +905,7 @@ class SolarArcCard extends HTMLElement {
   <!-- SUN PILL — navrch všeho (z-order) -->
   <g id="sun-pill" opacity="0">
     <foreignObject x="0" y="0" width="80" height="26">
-      <div xmlns="http://www.w3.org/1999/xhtml" style="
+      <div id="sun-pill-bg" xmlns="http://www.w3.org/1999/xhtml" style="
         width:100%;height:100%;border-radius:13px;box-sizing:border-box;
         background:var(--button-card-background,rgba(255,255,255,0.5));
         backdrop-filter:blur(20px) saturate(180%);
@@ -1204,6 +1206,14 @@ class SolarArcCard extends HTMLElement {
       });
       const pillTxt = sr.querySelector('#sun-pill-txt');
       if (pillTxt) pillTxt.style.color = cfg.arc_text_color;
+    }
+    if (cfg.arc_pill_bg_color) {
+      const el = sr.querySelector('#sun-pill-bg');
+      if (el) el.style.background = cfg.arc_pill_bg_color;
+    }
+    if (cfg.arc_pill_text_color) {
+      const el = sr.querySelector('#sun-pill-txt');
+      if (el) el.style.color = cfg.arc_pill_text_color;
     }
     if (cfg.arc_path_color_elapsed) {
       const col = cfg.arc_path_color_elapsed;
