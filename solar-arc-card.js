@@ -1,4 +1,4 @@
-// solar-arc-card.js v4r175
+// solar-arc-card.js v4r176
 
 const MDI = {
   generator:   'M6 3C4.89 3 4 3.9 4 5V16H6V17C6 17.55 6.45 18 7 18H8C8.55 18 9 17.55 9 17V16H15V17C15 17.55 15.45 18 16 18H17C17.55 18 18 17.55 18 17V16H20V5C20 3.9 19.11 3 18 3H6M12 7V5H18V7H12M12 9H18V11H12V9M8 5V9H10L7 15V11H5L8 5M22 20V22H2V20H22Z',
@@ -1003,7 +1003,7 @@ class SolarArcCard extends HTMLElement {
         const midY = f((mp[1] + L.INV[1] - RR) / 2);
         const moonPath = `M${mx},${my} C${mx},${midY} ${ex},${midY} ${ex},${ey}`;
         sr.querySelector('#p-solar').setAttribute('d', moonPath);
-        sr.querySelector('#p-solar').style.stroke = solStroke;
+        sr.querySelector('#p-solar').setAttribute('stroke', solStroke);
         solIds.forEach(id => { const e = sr.querySelector(id); if (e) { e.style.offsetPath = `path('${moonPath}')`; e.setAttribute('fill', solColor); } });
         for (let b = 0; b < 2; b++) { const h = sr.querySelector(`#dl-sol-${b}-0`); if (h) h.style.offsetPath = `path('${moonPath}')`; const c = sr.querySelector(`#dl-sol-${b}-core`); if (c) c.style.offsetPath = `path('${moonPath}')`; for (let s = 1; s <= 56; s++) { const e = sr.querySelector(`#dl-sol-${b}-${s}`); if (e) e.style.offsetPath = `path('${moonPath}')`; } }
         this._setParticles(sr, 'sol', solColor, true, this._dur(pv, PL.sol), moonPath, PL.sol);
@@ -1014,7 +1014,7 @@ class SolarArcCard extends HTMLElement {
         sr.querySelector('#sun-pill-txt').textContent = this._fmt(pv);
       } else {
         sr.querySelector('#p-solar').setAttribute('d', '');
-        sr.querySelector('#p-solar').style.stroke = 'transparent';
+        sr.querySelector('#p-solar').setAttribute('stroke', 'transparent');
         this._setParticles(sr, 'sol', solColor, false, this._dur(pv, PL.sol), undefined, PL.sol);
         moonPill.setAttribute('opacity', '0');
       }
@@ -1056,7 +1056,7 @@ class SolarArcCard extends HTMLElement {
       const midY      = f((sp[1] + L.INV[1] - RR) / 2);
       const solarPath = `M${sx},${sy} C${sx},${midY} ${ex},${midY} ${ex},${ey}`;
       sr.querySelector('#p-solar').setAttribute('d', solarPath);
-      sr.querySelector('#p-solar').style.stroke = isProd ? solStroke : 'transparent';
+      sr.querySelector('#p-solar').setAttribute('stroke', isProd ? solStroke : 'transparent');
       solIds.forEach(id => { const e = sr.querySelector(id); if (e) { e.style.offsetPath = `path('${solarPath}')`; e.setAttribute('fill', solColor); } });
       for (let b = 0; b < 2; b++) { const h = sr.querySelector(`#dl-sol-${b}-0`); if (h) h.style.offsetPath = `path('${solarPath}')`; const c = sr.querySelector(`#dl-sol-${b}-core`); if (c) c.style.offsetPath = `path('${solarPath}')`; for (let s = 1; s <= 56; s++) { const e = sr.querySelector(`#dl-sol-${b}-${s}`); if (e) e.style.offsetPath = `path('${solarPath}')`; } }
       this._setParticles(sr, 'sol', solColor, isProd, this._dur(pv, PL.sol), solarPath, PL.sol);
@@ -1097,9 +1097,9 @@ class SolarArcCard extends HTMLElement {
     this._setParticles(sr, 'hse', hseColor, house > 20, this._dur(house, PL.hse), undefined, PL.hse);
 
     const flowLine = cfg.arc_flow_line_color || 'rgba(255,255,255,0.12)';
-    sr.querySelector('#p-from-grid').style.stroke = isImport ? flowLine : 'transparent';
-    sr.querySelector('#p-to-grid').style.stroke   = flowLine;
-    sr.querySelector('#p-to-house').style.stroke  = flowLine;
+    sr.querySelector('#p-from-grid').setAttribute('stroke', isImport ? flowLine : 'transparent');
+    sr.querySelector('#p-to-grid').setAttribute('stroke', flowLine);
+    sr.querySelector('#p-to-house').setAttribute('stroke', flowLine);
 
     // ── Style: node barvy a glow gradienty ───────────────────────────────────
     const inactiveColor = cfg.arc_inactive_color || null;
@@ -1192,8 +1192,8 @@ class SolarArcCard extends HTMLElement {
       // Dim paths
       const pFromBat = sr.querySelector('#p-from-bat');
       const pToBat   = sr.querySelector('#p-to-bat');
-      if (pFromBat) pFromBat.style.stroke = isDischarging ? flowLine : 'transparent';
-      if (pToBat)   pToBat.style.stroke   = isCharging    ? flowLine : 'transparent';
+      if (pFromBat) pFromBat.setAttribute('stroke', isDischarging ? flowLine : 'transparent');
+      if (pToBat)   pToBat.setAttribute('stroke', isCharging    ? flowLine : 'transparent');
     }
 
     // ── Barvy textu a ikon ────────────────────────────────────────────────────
