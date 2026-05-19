@@ -1,4 +1,4 @@
-// solar-arc-card.js v4r172
+// solar-arc-card.js v4r173
 
 const MDI = {
   generator:   'M6 3C4.89 3 4 3.9 4 5V16H6V17C6 17.55 6.45 18 7 18H8C8.55 18 9 17.55 9 17V16H15V17C15 17.55 15.45 18 16 18H17C17.55 18 18 17.55 18 17V16H20V5C20 3.9 19.11 3 18 3H6M12 7V5H18V7H12M12 9H18V11H12V9M8 5V9H10L7 15V11H5L8 5M22 20V22H2V20H22Z',
@@ -1045,7 +1045,7 @@ class SolarArcCard extends HTMLElement {
       ap.setAttribute('stroke-dasharray', `${f(prog)} 9999`);
       ap.setAttribute('opacity', isDay ? '0.9' : '0');
       const arcRem = sr.querySelector('#arc-remaining');
-      if (arcRem && cfg.arc_path_color_remaining) {
+      if (arcRem && this._config.arc_path_color_remaining) {
         const totalLen = this._arcLen(1, L.A0, L.A1, L.A2);
         arcRem.setAttribute('stroke-dasharray', `${f(totalLen - prog)} 9999`);
         arcRem.setAttribute('stroke-dashoffset', `${f(-prog)}`);
