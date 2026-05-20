@@ -1177,8 +1177,8 @@ class SolarArcCard extends HTMLElement {
         : isCharging
           ? (cfg.arc_battery_charge_color   ? this._ensureArcGrad(sr, batChgColor) : 'rg-grn')
           : 'rg-grn';
-      const batLabel = isDischarging ? `↑ ${this._fmt(bat)}`
-                     : isCharging    ? `↓ ${this._fmt(Math.abs(bat))}`
+      const batLabel = isDischarging ? `↓ ${this._fmt(bat)}`
+                     : isCharging    ? `↑ ${this._fmt(Math.abs(bat))}`
                      : this._fmt(Math.abs(bat));
       this._nodeUpdate(sr, 'bat', batActive,
         batFill || 'rgba(48,209,88,0.90)', batGradId, batLabel, inactiveColor);
@@ -1227,7 +1227,7 @@ class SolarArcCard extends HTMLElement {
       if (el) el.setAttribute('stroke', cfg.arc_path_color_remaining);
     }
     if (cfg.arc_icon_color) {
-      ['#inv-icon .node-path','#grd-icon .node-path','#hse-icon .node-path'].forEach(sel => {
+      ['#inv-icon .node-path','#grd-icon .node-path','#hse-icon .node-path','#bat-icon .node-path'].forEach(sel => {
         const el = sr.querySelector(sel);
         if (el) el.setAttribute('fill', cfg.arc_icon_color);
       });
